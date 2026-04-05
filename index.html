@@ -492,23 +492,51 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     </div>
                     <!-- API Settings Tab -->
                     <div id="tab-api-settings" class="settings-tab-content hidden">
-                        <h3 class="text-lg font-semibold mb-4">Cài đặt Google API</h3>
-                        <p class="text-sm text-gray-600 mb-4">Nhập thông tin xác thực Google Cloud của bạn để kết nối với Google Drive và Google Sheets.</p>
-                        <div class="space-y-4">
+                        <h3 class="text-base font-semibold mb-1 text-gray-800">Cài đặt Google API</h3>
+                        <p class="text-xs text-gray-500 mb-4">Kết nối với Google Drive và Google Sheets của bạn.</p>
+
+                        <!-- Hướng dẫn -->
+                        <div class="mb-5 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <p class="text-xs font-semibold text-blue-800 mb-2">Cách lấy thông tin xác thực:</p>
+                            <ol class="text-xs text-blue-700 space-y-1 list-decimal list-inside leading-5">
+                                <li>Vào <strong>Google Cloud Console</strong> → tạo Project mới</li>
+                                <li>Enable <strong>Google Drive API</strong> và <strong>Google Sheets API</strong></li>
+                                <li>Vào <strong>APIs &amp; Services → Credentials</strong></li>
+                                <li>Tạo <strong>OAuth 2.0 Client ID</strong> (loại Web application) → copy Client ID</li>
+                                <li>Tạo <strong>API Key</strong> → copy API Key</li>
+                                <li>Thêm domain của bạn vào <em>Authorized JavaScript origins</em></li>
+                            </ol>
+                        </div>
+
+                        <div class="space-y-3">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Google Client ID</label>
-                                <input type="text" id="setting-client-id" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="Nhập Client ID">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Google Client ID <span class="text-red-500">*</span></label>
+                                <input type="text" id="setting-client-id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none font-mono" placeholder="xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Google API Key</label>
-                                <input type="text" id="setting-api-key" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="Nhập API Key">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Google API Key <span class="text-red-500">*</span></label>
+                                <input type="text" id="setting-api-key" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none font-mono" placeholder="AIzaSy...">
+                                <p class="text-xs text-gray-400 mt-1">Cần enable Drive API + Sheets API và restrict API Key cho 2 API này.</p>
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Google Sheet ID (Khách hàng)</label>
-                                <input type="text" id="setting-sheet-id" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm" placeholder="Nhập ID của Google Sheet">
-                                <p class="text-xs text-gray-500 mt-1">ID là chuỗi ký tự trong URL của Google Sheet (ví dụ: 1BxiMVs0XRYFgwnPS532...).</p>
+
+                            <div class="border-t border-gray-100 pt-3">
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Google Sheet ID <span class="text-gray-400 font-normal">(Danh sách Khách Hàng)</span></label>
+                                <input type="text" id="setting-sheet-id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none font-mono" placeholder="1BxiMVs0XRYFgwnPS532...">
+                                <p class="text-xs text-gray-400 mt-1">
+                                    Lấy từ URL: <code class="bg-gray-100 px-1 rounded">https://docs.google.com/spreadsheets/d/<strong>[SHEET_ID]</strong>/edit</code>
+                                </p>
+                                <p class="text-xs text-amber-600 mt-1">
+                                    ⚠ Sheet phải có 2 tab: <strong>"Khách Hàng"</strong> và <strong>"Người Liên Hệ"</strong> (dùng file mẫu đã tải).
+                                </p>
                             </div>
-                            <button id="save-api-settings-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Lưu API Settings</button>
+
+                            <!-- Trạng thái kết nối -->
+                            <div id="sheet-connection-status" class="hidden rounded-lg px-4 py-3 text-sm"></div>
+
+                            <div class="flex gap-2 pt-1">
+                                <button id="save-api-settings-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition">Lưu & Kết nối</button>
+                                <button id="test-sheet-btn" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition">Kiểm tra kết nối Sheet</button>
+                            </div>
                         </div>
                     </div>
                     <!-- Template Manage Tab -->
@@ -1924,56 +1952,87 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         };
 
         async function syncCustomersFromSheet() {
-            if (isDemoMode) return;
-            // In a real app, this would fetch from Google Sheets API
-            // For now, we'll just use the mock data if it's empty
-            if (customers.length === 0) {
-                // Try to load from localStorage as a fallback cache
+            if (isDemoMode) {
+                // Demo mode: dùng mock data
+                const cached = localStorage.getItem('docflow_customers');
+                if (cached) { try { customers = JSON.parse(cached); } catch(e) {} }
+                if (!customers.length) {
+                    customers = [
+                        { id:'kh_001', ten_cong_ty:'Công ty TNHH Phần mềm ABC', ten_viet_tat:'ABC SW', mst:'0101234567', dia_chi:'123 Nguyễn Văn Linh, Q7', tinh_thanh:'TP.HCM', sdt:'028 3812 3456', email:'contact@abcsoftware.vn', nguoi_dai_dien:'Nguyễn Văn A', chuc_vu:'Giám đốc', trang_thai:'Hoạt động', lien_he:[{ id:'lh_001', ten:'Nguyễn Văn A', chuc_vu:'Giám đốc', sdt:'0901234567', email:'nva@abcsoftware.vn', la_chinh:true }] },
+                        { id:'kh_002', ten_cong_ty:'Công ty CP Thương mại XYZ', ten_viet_tat:'XYZ Corp', mst:'0309876543', dia_chi:'456 Lê Lợi, Q1', tinh_thanh:'TP.HCM', sdt:'028 3822 9876', email:'info@xyztrading.com', nguoi_dai_dien:'Lê Văn C', chuc_vu:'Tổng Giám đốc', trang_thai:'Hoạt động', lien_he:[{ id:'lh_003', ten:'Lê Văn C', chuc_vu:'TGĐ', sdt:'0987654321', email:'lvc@xyztrading.com', la_chinh:true }] }
+                    ];
+                    localStorage.setItem('docflow_customers', JSON.stringify(customers));
+                }
+                renderCustomerList();
+                return;
+            }
+
+            // Nếu chưa có SHEET_ID → load từ localStorage cache
+            if (!SHEET_ID) {
                 const cached = localStorage.getItem('docflow_customers');
                 if (cached) {
-                    try {
-                        customers = JSON.parse(cached);
-                        renderCustomerList();
-                        return;
-                    } catch (e) {
-                        console.error("Error parsing cached customers", e);
-                    }
+                    try { customers = JSON.parse(cached); renderCustomerList(); } catch(e) {}
                 }
-                
-                // If no cache, load mock data
-                customers = [
-                    {
-                        id: 'kh_001',
-                        ten_cong_ty: 'Công ty TNHH Phần mềm ABC',
-                        mst: '0101234567',
-                        dia_chi: '123 Đường Nguyễn Văn Linh, Quận 7, TP.HCM',
-                        sdt: '028 3812 3456',
-                        email: 'contact@abcsoftware.vn',
-                        nguoi_dai_dien: 'Nguyễn Văn A',
-                        chuc_vu: 'Giám đốc',
-                        trang_thai: 'Hoạt động',
-                        lien_he: [
-                            { id: 'lh_001', ten: 'Nguyễn Văn A', chuc_vu: 'Giám đốc', sdt: '0901234567', email: 'nva@abcsoftware.vn', la_chinh: true },
-                            { id: 'lh_002', ten: 'Trần Thị B', chuc_vu: 'Kế toán trưởng', sdt: '0912345678', email: 'ttb@abcsoftware.vn', la_chinh: false }
-                        ]
-                    },
-                    {
-                        id: 'kh_002',
-                        ten_cong_ty: 'Công ty Cổ phần Thương mại XYZ',
-                        mst: '0309876543',
-                        dia_chi: '456 Lê Lợi, Quận 1, TP.HCM',
-                        sdt: '028 3822 9876',
-                        email: 'info@xyztrading.com',
-                        nguoi_dai_dien: 'Lê Văn C',
-                        chuc_vu: 'Tổng Giám đốc',
-                        trang_thai: 'Hoạt động',
-                        lien_he: [
-                            { id: 'lh_003', ten: 'Lê Văn C', chuc_vu: 'Tổng Giám đốc', sdt: '0987654321', email: 'lvc@xyztrading.com', la_chinh: true }
-                        ]
-                    }
-                ];
+                return;
+            }
+
+            // Nếu chưa đăng nhập → chờ
+            if (!gapiInited || !accessToken) {
+                const cached = localStorage.getItem('docflow_customers');
+                if (cached) { try { customers = JSON.parse(cached); renderCustomerList(); } catch(e) {} }
+                return;
+            }
+
+            // Gọi Google Sheets API thực sự
+            try {
+                showToast("Đang đồng bộ dữ liệu khách hàng từ Sheet...");
+
+                // Đọc sheet "Khách Hàng"
+                const khRes = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: SHEET_ID,
+                    range: 'Khách Hàng!A2:M'
+                });
+                const khRows = khRes.result.values || [];
+                const KH_COLS = ['id','ten_cong_ty','ten_viet_tat','dia_chi','tinh_thanh',
+                    'mst','sdt','email','nguoi_dai_dien','chuc_vu','ghi_chu','ngay_tao','trang_thai'];
+                const syncedCustomers = khRows
+                    .filter(r => r[0] && r[1])
+                    .map(r => Object.fromEntries(KH_COLS.map((k, i) => [k, r[i] || ''])));
+
+                // Đọc sheet "Người Liên Hệ"
+                try {
+                    const ctRes = await gapi.client.sheets.spreadsheets.values.get({
+                        spreadsheetId: SHEET_ID,
+                        range: 'Người Liên Hệ!A2:H'
+                    });
+                    const ctRows = ctRes.result.values || [];
+                    const CT_COLS = ['id','kh_id','ten','chuc_vu','sdt','email','la_chinh','ghi_chu'];
+                    const allContacts = ctRows
+                        .filter(r => r[0] && r[1])
+                        .map(r => {
+                            const ct = Object.fromEntries(CT_COLS.map((k, i) => [k, r[i] || '']));
+                            ct.la_chinh = ct.la_chinh === 'yes';
+                            return ct;
+                        });
+                    syncedCustomers.forEach(c => {
+                        c.lien_he = allContacts.filter(ct => ct.kh_id === c.id);
+                    });
+                } catch(e) {
+                    syncedCustomers.forEach(c => { c.lien_he = []; });
+                }
+
+                customers = syncedCustomers;
                 localStorage.setItem('docflow_customers', JSON.stringify(customers));
                 renderCustomerList();
+                showToast("Đồng bộ thành công! " + customers.length + " khách hàng.");
+
+            } catch (err) {
+                console.error("Lỗi đồng bộ Sheet:", err);
+                const errMsg = err.result?.error?.message || err.message || 'Lỗi không xác định';
+                // Fallback về cache
+                const cached = localStorage.getItem('docflow_customers');
+                if (cached) { try { customers = JSON.parse(cached); renderCustomerList(); } catch(e2) {} }
+                showToast("Lỗi đồng bộ Sheet: " + errMsg, true);
             }
         }
 
@@ -2277,12 +2336,18 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         document.getElementById('customer-search').addEventListener('input', debouncedRenderCustomerList);
         document.getElementById('customer-status-filter').addEventListener('change', renderCustomerList);
 
-        document.getElementById('sync-customers-btn').addEventListener('click', () => {
-            showToast("Đang đồng bộ dữ liệu khách hàng...");
-            setTimeout(() => {
-                syncCustomersFromSheet();
-                showToast("Đồng bộ thành công!");
-            }, 1000);
+        document.getElementById('sync-customers-btn').addEventListener('click', async () => {
+            if (!SHEET_ID) {
+                showToast("Chưa cấu hình Sheet ID. Vào Settings → Cài đặt API để nhập.", true);
+                return;
+            }
+            if (!gapiInited || !accessToken) {
+                showToast("Vui lòng đăng nhập Google trước khi đồng bộ.", true);
+                return;
+            }
+            // Force re-sync (ignore cache)
+            customers = [];
+            await syncCustomersFromSheet();
         });
 
         // Customer Modal Listeners
@@ -2840,13 +2905,16 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         function loadSettings() {
             const settings = JSON.parse(localStorage.getItem('docflow_settings') || '{}');
-            document.getElementById('setting-company-name').value = settings.companyName || '';
-            document.getElementById('setting-company-address').value = settings.companyAddress || '';
-            document.getElementById('setting-company-tax').value = settings.companyTax || '';
-            document.getElementById('setting-company-phone').value = settings.companyPhone || '';
-            document.getElementById('setting-company-email').value = settings.companyEmail || '';
-            document.getElementById('setting-company-rep').value = settings.companyRep || '';
-            document.getElementById('setting-company-rep-title').value = settings.companyRepTitle || '';
+            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+            setVal('setting-company-name',       settings.companyName);
+            setVal('setting-company-address',    settings.companyAddress);
+            setVal('setting-company-tax',        settings.companyTax);
+            setVal('setting-company-phone',      settings.companyPhone);
+            setVal('setting-company-email',      settings.companyEmail);
+            setVal('setting-company-rep',        settings.companyRep);
+            setVal('setting-company-rep-title',  settings.companyRepTitle);
+            setVal('setting-company-website',    settings.companyWebsite);
+            setVal('setting-company-bank',       settings.companyBank);
             
             document.getElementById('setting-customer-name').value = settings.customerName || '';
             document.getElementById('setting-customer-address').value = settings.customerAddress || '';
@@ -2870,6 +2938,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 companyEmail: document.getElementById('setting-company-email').value,
                 companyRep: document.getElementById('setting-company-rep').value,
                 companyRepTitle: document.getElementById('setting-company-rep-title').value,
+                companyWebsite:  (document.getElementById('setting-company-website') || {value:''}).value,
+                companyBank:     (document.getElementById('setting-company-bank') || {value:''}).value,
                 customerName: document.getElementById('setting-customer-name').value,
                 customerAddress: document.getElementById('setting-customer-address').value,
                 customerTax: document.getElementById('setting-customer-tax').value,
@@ -2882,22 +2952,75 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             showToast("Đã lưu cài đặt");
         }
         
-        document.getElementById('save-api-settings-btn').addEventListener('click', () => {
+        document.getElementById('save-api-settings-btn').addEventListener('click', async () => {
             const newClientId = document.getElementById('setting-client-id').value.trim();
-            const newApiKey = document.getElementById('setting-api-key').value.trim();
-            const newSheetId = document.getElementById('setting-sheet-id').value.trim();
-            
-            localStorage.setItem('docflow_client_id', newClientId);
-            CLIENT_ID = newClientId;
-            
-            localStorage.setItem('docflow_api_key', newApiKey);
-            API_KEY = newApiKey;
+            const newApiKey   = document.getElementById('setting-api-key').value.trim();
+            const newSheetId  = document.getElementById('setting-sheet-id').value.trim();
 
-            localStorage.setItem('docflow_sheet_id', newSheetId);
-            SHEET_ID = newSheetId;
-            
-            showToast("Đã lưu cài đặt API. Vui lòng tải lại trang để áp dụng.", false);
-            setTimeout(() => window.location.reload(), 1500);
+            if (!newClientId) { showToast("Vui lòng nhập Google Client ID", true); return; }
+            if (!newApiKey)   { showToast("Vui lòng nhập Google API Key", true); return; }
+
+            localStorage.setItem('docflow_client_id', newClientId);
+            localStorage.setItem('docflow_api_key',   newApiKey);
+            localStorage.setItem('docflow_sheet_id',  newSheetId);
+            CLIENT_ID = newClientId;
+            API_KEY   = newApiKey;
+            SHEET_ID  = newSheetId;
+
+            showToast("Đã lưu. Đang tải lại trang...");
+            setTimeout(() => window.location.reload(), 1200);
+        });
+
+        // Nút kiểm tra kết nối Sheet
+        document.getElementById('test-sheet-btn').addEventListener('click', async () => {
+            const sheetId = document.getElementById('setting-sheet-id').value.trim();
+            const statusEl = document.getElementById('sheet-connection-status');
+
+            if (!sheetId) {
+                statusEl.className = 'rounded-lg px-4 py-3 text-sm bg-amber-50 border border-amber-200 text-amber-800';
+                statusEl.textContent = '⚠ Vui lòng nhập Sheet ID trước.';
+                statusEl.classList.remove('hidden');
+                return;
+            }
+            if (!gapiInited || !accessToken) {
+                statusEl.className = 'rounded-lg px-4 py-3 text-sm bg-amber-50 border border-amber-200 text-amber-800';
+                statusEl.textContent = '⚠ Vui lòng đăng nhập Google trước khi kiểm tra.';
+                statusEl.classList.remove('hidden');
+                return;
+            }
+
+            statusEl.className = 'rounded-lg px-4 py-3 text-sm bg-blue-50 border border-blue-200 text-blue-800';
+            statusEl.textContent = '⏳ Đang kiểm tra kết nối...';
+            statusEl.classList.remove('hidden');
+
+            try {
+                // Thử đọc metadata của spreadsheet
+                const res = await gapi.client.sheets.spreadsheets.get({
+                    spreadsheetId: sheetId,
+                    fields: 'spreadsheetId,properties/title,sheets/properties/title'
+                });
+                const title = res.result.properties.title;
+                const sheetNames = res.result.sheets.map(s => s.properties.title);
+
+                const hasKH = sheetNames.includes('Khách Hàng');
+                const hasLH = sheetNames.includes('Người Liên Hệ');
+
+                if (hasKH && hasLH) {
+                    statusEl.className = 'rounded-lg px-4 py-3 text-sm bg-green-50 border border-green-200 text-green-800';
+                    statusEl.innerHTML = `✓ <strong>Kết nối thành công!</strong> File: "${title}"<br>
+                        Tìm thấy sheet: "Khách Hàng" ✓ và "Người Liên Hệ" ✓`;
+                } else {
+                    const missing = [!hasKH && '"Khách Hàng"', !hasLH && '"Người Liên Hệ"'].filter(Boolean).join(', ');
+                    statusEl.className = 'rounded-lg px-4 py-3 text-sm bg-amber-50 border border-amber-200 text-amber-800';
+                    statusEl.innerHTML = `⚠ Kết nối được file "${title}" nhưng thiếu sheet: ${missing}.<br>
+                        Vui lòng dùng <strong>file mẫu DocFlow_Khach_Hang_Mau.xlsx</strong> đã tải về.`;
+                }
+            } catch (err) {
+                const msg = err.result?.error?.message || err.message || 'Lỗi không xác định';
+                statusEl.className = 'rounded-lg px-4 py-3 text-sm bg-red-50 border border-red-200 text-red-800';
+                statusEl.innerHTML = `✗ <strong>Không kết nối được.</strong> Lỗi: ${msg}<br>
+                    Kiểm tra: Sheet ID đúng chưa? Đã share Sheet với tài khoản Google chưa?`;
+            }
         });
 
         function populateSettingsTemplateSelect() {
