@@ -1166,32 +1166,34 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
             const reader = new FileReader();
             reader.onload = function(e) {
-                const content = e.target.result;
+                const arrayBuffer = e.target.result;
                 const type = file.name.endsWith('.xlsx') ? 'xlsx' : 'docx';
-                const templateObj = { 
-                    id: 'local_' + Date.now(), 
-                    name: file.name, 
-                    content: content,
+
+                // Chuyển ArrayBuffer → Uint8Array để PizZip đọc đúng
+                const uint8 = new Uint8Array(arrayBuffer);
+
+                const templateObj = {
+                    id: 'local_' + Date.now(),
+                    name: file.name,
+                    content: uint8,          // Uint8Array — dùng cho PizZip (docx)
+                    contentBuffer: arrayBuffer, // ArrayBuffer — dùng cho mammoth
                     type: type,
                     source: 'local'
                 };
-                
-                // Check if already exists by name
+
                 const existingIdx = templates.findIndex(t => t.name === file.name && t.source === 'local');
                 if (existingIdx >= 0) {
                     templates[existingIdx] = templateObj;
                 } else {
-                    templates.unshift(templateObj); // Add to top
+                    templates.unshift(templateObj);
                 }
-                
+
                 renderTemplateList();
                 selectTemplate(templateObj);
                 showToast(`Đã tải lên: ${file.name}`);
-                
-                // Reset input
                 event.target.value = '';
             };
-            reader.readAsBinaryString(file);
+            reader.readAsArrayBuffer(file);   // ← ArrayBuffer thay vì BinaryString
         }
 
         function renderTemplateList() {
@@ -1279,13 +1281,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     });
                     const blob = await fetchRes.blob();
                     
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        template.content = e.target.result;
-                        template.type = template.name.endsWith('.xlsx') ? 'xlsx' : 'docx';
-                        extractVariablesAndBuildForm(template);
-                    };
-                    reader.readAsBinaryString(blob);
+                    const arrayBuf = await blob.arrayBuffer();
+                    template.content = new Uint8Array(arrayBuf);
+                    template.contentBuffer = arrayBuf;
+                    template.type = template.name.endsWith('.xlsx') ? 'xlsx' : 'docx';
+                    extractVariablesAndBuildForm(template);
                     return;
                 } catch (err) {
                     console.error("Error fetching file content", err);
@@ -1321,8 +1321,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const tables = {};
                 
                 if (template.type === 'xlsx') {
-                    const workbook = XLSX.read(template.content, { type: 'binary' });
-                    const regex = /\{([^{}]+)\}/g;
+                    const workbook = XLSX.read(template.content, { type: 'array' });
+                    const regex = /\{\{([^{}]+?)\}\}/g;
                     
                     workbook.SheetNames.forEach(sheetName => {
                         const sheet = workbook.Sheets[sheetName];
@@ -1394,16 +1394,28 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         }
                     }
                 } else {
-                    const zip = new PizZip(template.content);
-                    const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-                    const text = doc.getFullText();
-                    
-                    // Regex to find {variables}
-                    const regex = /\{([^{}]+)\}/g;
+                    // Đọc raw XML để quét biến — không cần render
+                    let rawXml = '';
+                    try {
+                        const zip = new PizZip(template.content);
+                        rawXml = zip.files['word/document.xml']
+                            ? zip.files['word/document.xml'].asText()
+                            : '';
+                    } catch(zipErr) {
+                        console.error('PizZip error:', zipErr);
+                        showToast('Lỗi đọc file DOCX. File có thể bị hỏng.', true);
+                        return;
+                    }
+
+                    // Xóa XML tags để lấy text thuần
+                    const cleanText = rawXml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+                    // Regex tìm {{BIEN}} — double braces (cú pháp docxtemplater)
+                    const regex = /\{\{([^{}]+?)\}\}/g;
                     let match;
                     let currentTable = null;
 
-                    while ((match = regex.exec(text)) !== null) {
+                    while ((match = regex.exec(cleanText)) !== null) {
                         let varName = match[1].trim();
                         if (varName.startsWith('#TABLE_')) {
                             currentTable = varName.substring(1);
@@ -1415,7 +1427,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                             continue;
                         }
                         if(varName.startsWith('#') || varName.startsWith('/') || varName.startsWith('^')) continue;
-                        
+
                         if (currentTable) {
                             if (!tables[currentTable].includes(varName)) {
                                 tables[currentTable].push(varName);
@@ -1879,13 +1891,32 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     
                     return { type: 'pdf', blob: pdfBlob, extension: 'pdf', mimeType: 'application/pdf' };
                 } else {
-                    const zip = new PizZip(currentTemplate.content);
+                    let zip;
+                    try {
+                        zip = new PizZip(currentTemplate.content);
+                    } catch(zipErr) {
+                        showToast('Lỗi đọc file DOCX: ' + (zipErr.message || 'file bị hỏng'), true);
+                        throw zipErr;
+                    }
+
                     const doc = new window.docxtemplater(zip, {
                         paragraphLoop: true,
                         linebreaks: true,
+                        delimiters: { start: '{{', end: '}}' },
+                        nullGetter: () => '',          // Biến không có giá trị → chuỗi rỗng
+                        errorLogging: false,
                     });
 
-                    doc.render(finalData);
+                    try {
+                        doc.render(finalData);
+                    } catch(renderErr) {
+                        const errMsg = renderErr.properties?.errors
+                            ?.map(e => e.properties?.id || e.message).join(', ')
+                            || renderErr.message || 'Lỗi render';
+                        showToast('Lỗi ghép dữ liệu vào template: ' + errMsg, true);
+                        console.error('docxtemplater render error:', renderErr);
+                        throw renderErr;
+                    }
 
                     const out = doc.getZip().generate({
                         type: "blob",
@@ -1898,7 +1929,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     } else if (type === 'pdf') {
                         // Client-side PDF generation via mammoth + html2pdf
                         const arrayBuffer = await out.arrayBuffer();
-                        const result = await mammoth.convertToHtml({arrayBuffer: arrayBuffer});
+                        const result = await mammoth.convertToHtml({ arrayBuffer });
                         
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = result.value;
@@ -3057,8 +3088,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const vars = new Set();
                 
                 if (template.type === 'xlsx') {
-                    const workbook = XLSX.read(template.content, { type: 'binary' });
-                    const regex = /\{([^{}]+)\}/g;
+                    const workbook = XLSX.read(template.content, { type: 'array' });
+                    const regex = /\{\{([^{}]+?)\}\}/g;
                     
                     workbook.SheetNames.forEach(sheetName => {
                         const sheet = workbook.Sheets[sheetName];
@@ -3129,13 +3160,21 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         }
                     }
                 } else {
-                    const zip = new PizZip(template.content);
-                    const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-                    const text = doc.getFullText();
-                    const regex = /\{([^{}]+)\}/g;
-                    let match;
-                    while ((match = regex.exec(text)) !== null) {
-                        let varName = match[1].trim();
+                    let rawXml2 = '';
+                    try {
+                        const zip2 = new PizZip(template.content);
+                        rawXml2 = zip2.files['word/document.xml']
+                            ? zip2.files['word/document.xml'].asText() : '';
+                    } catch(e2) {
+                        list.innerHTML = '<p class="text-sm text-red-500 py-4">Lỗi đọc file DOCX: ' + (e2.message||'file bị hỏng') + '</p>';
+                        container.classList.remove('hidden');
+                        return;
+                    }
+                    const cleanXml = rawXml2.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                    const regex2 = /\{\{([^{}]+?)\}\}/g;
+                    let match2;
+                    while ((match2 = regex2.exec(cleanXml)) !== null) {
+                        let varName = match2[1].trim();
                         if(varName.startsWith('#') || varName.startsWith('/') || varName.startsWith('^')) continue;
                         vars.add(varName);
                     }
