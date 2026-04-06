@@ -1169,14 +1169,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const arrayBuffer = e.target.result;
                 const type = file.name.endsWith('.xlsx') ? 'xlsx' : 'docx';
 
-                // Chuyển ArrayBuffer → Uint8Array để PizZip đọc đúng
-                const uint8 = new Uint8Array(arrayBuffer);
-
                 const templateObj = {
                     id: 'local_' + Date.now(),
                     name: file.name,
-                    content: uint8,          // Uint8Array — dùng cho PizZip (docx)
-                    contentBuffer: arrayBuffer, // ArrayBuffer — dùng cho mammoth
+                    content: arrayBuffer,       // ArrayBuffer — PizZip và XLSX đều đọc được
                     type: type,
                     source: 'local'
                 };
@@ -1190,10 +1186,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
                 renderTemplateList();
                 selectTemplate(templateObj);
-                showToast(`Đã tải lên: ${file.name}`);
+                showToast('Đã tải lên: ' + file.name);
                 event.target.value = '';
             };
-            reader.readAsArrayBuffer(file);   // ← ArrayBuffer thay vì BinaryString
+            reader.readAsArrayBuffer(file);
         }
 
         function renderTemplateList() {
@@ -1282,10 +1278,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     const blob = await fetchRes.blob();
                     
                     const arrayBuf = await blob.arrayBuffer();
-                    template.content = new Uint8Array(arrayBuf);
-                    template.contentBuffer = arrayBuf;
+                    template.content = arrayBuf;
                     template.type = template.name.endsWith('.xlsx') ? 'xlsx' : 'docx';
-                    extractVariablesAndBuildForm(template);
+                    await extractVariablesAndBuildForm(template);
                     return;
                 } catch (err) {
                     console.error("Error fetching file content", err);
@@ -1294,7 +1289,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 }
             }
 
-            extractVariablesAndBuildForm(template);
+            await extractVariablesAndBuildForm(template);
         }
 
         function clearSelectedTemplate() {
@@ -1315,13 +1310,13 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             `;
         }
 
-        function extractVariablesAndBuildForm(template) {
+        async function extractVariablesAndBuildForm(template) {
             try {
                 const vars = new Set();
                 const tables = {};
                 
                 if (template.type === 'xlsx') {
-                    const workbook = XLSX.read(template.content, { type: 'array' });
+                    const workbook = XLSX.read(new Uint8Array(template.content), { type: 'array' });
                     const regex = /\{\{([^{}]+?)\}\}/g;
                     
                     workbook.SheetNames.forEach(sheetName => {
@@ -1394,28 +1389,33 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         }
                     }
                 } else {
-                    // Đọc raw XML để quét biến — không cần render
+                    // Đọc raw XML từ docx zip, strip tags, tìm {{BIEN}}
                     let rawXml = '';
                     try {
                         const zip = new PizZip(template.content);
                         rawXml = zip.files['word/document.xml']
-                            ? zip.files['word/document.xml'].asText()
-                            : '';
+                            ? zip.files['word/document.xml'].asText() : '';
                     } catch(zipErr) {
                         console.error('PizZip error:', zipErr);
-                        showToast('Lỗi đọc file DOCX. File có thể bị hỏng.', true);
-                        return;
+                        // Fallback: dùng mammoth nếu PizZip fail
+                        try {
+                            const r = await mammoth.extractRawText({ arrayBuffer: template.content });
+                            rawXml = r.value || '';
+                        } catch(mamErr) {
+                            showToast('Lỗi đọc file DOCX: ' + (mamErr.message || 'file bị hỏng'), true);
+                            return;
+                        }
                     }
 
-                    // Xóa XML tags để lấy text thuần
+                    // Strip XML tags để lấy text thuần
                     const cleanText = rawXml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
-                    // Regex tìm {{BIEN}} — double braces (cú pháp docxtemplater)
+                    // Regex tìm {{BIEN}} — double braces
                     const regex = /\{\{([^{}]+?)\}\}/g;
                     let match;
                     let currentTable = null;
 
-                    while ((match = regex.exec(cleanText)) !== null) {
+                    while ((match = regex.exec(docText)) !== null) {
                         let varName = match[1].trim();
                         if (varName.startsWith('#TABLE_')) {
                             currentTable = varName.substring(1);
@@ -1690,7 +1690,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const fileName = `${baseName}${customerPart}_${new Date().getTime()}`;
 
                 if (currentTemplate.type === 'xlsx') {
-                    const workbook = XLSX.read(currentTemplate.content, { type: 'binary' });
+                    const workbook = XLSX.read(new Uint8Array(currentTemplate.content), { type: 'array' });
                     
                     workbook.SheetNames.forEach(sheetName => {
                         const sheet = workbook.Sheets[sheetName];
@@ -1895,6 +1895,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     try {
                         zip = new PizZip(currentTemplate.content);
                     } catch(zipErr) {
+                        console.error('PizZip error:', zipErr);
                         showToast('Lỗi đọc file DOCX: ' + (zipErr.message || 'file bị hỏng'), true);
                         throw zipErr;
                     }
@@ -1929,7 +1930,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     } else if (type === 'pdf') {
                         // Client-side PDF generation via mammoth + html2pdf
                         const arrayBuffer = await out.arrayBuffer();
-                        const result = await mammoth.convertToHtml({ arrayBuffer });
+                        const result = await mammoth.convertToHtml({ arrayBuffer: currentTemplate.content });
                         
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = result.value;
@@ -3088,7 +3089,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const vars = new Set();
                 
                 if (template.type === 'xlsx') {
-                    const workbook = XLSX.read(template.content, { type: 'array' });
+                    const workbook = XLSX.read(new Uint8Array(template.content), { type: 'array' });
                     const regex = /\{\{([^{}]+?)\}\}/g;
                     
                     workbook.SheetNames.forEach(sheetName => {
@@ -3160,20 +3161,27 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         }
                     }
                 } else {
-                    let rawXml2 = '';
+                    // Schema editor: đọc raw XML từ zip, strip tags, tìm {{BIEN}}
+                    let schemaXml = '';
                     try {
-                        const zip2 = new PizZip(template.content);
-                        rawXml2 = zip2.files['word/document.xml']
-                            ? zip2.files['word/document.xml'].asText() : '';
-                    } catch(e2) {
-                        list.innerHTML = '<p class="text-sm text-red-500 py-4">Lỗi đọc file DOCX: ' + (e2.message||'file bị hỏng') + '</p>';
-                        container.classList.remove('hidden');
-                        return;
+                        const schemaZip = new PizZip(template.content);
+                        schemaXml = schemaZip.files['word/document.xml']
+                            ? schemaZip.files['word/document.xml'].asText() : '';
+                    } catch(e3) {
+                        // Fallback mammoth
+                        try {
+                            const mRes = await mammoth.extractRawText({ arrayBuffer: template.content });
+                            schemaXml = mRes.value || '';
+                        } catch(e4) {
+                            list.innerHTML = '<p class="text-sm text-red-500 py-4">Lỗi đọc DOCX: ' + (e4.message||'unknown') + '</p>';
+                            container.classList.remove('hidden');
+                            return;
+                        }
                     }
-                    const cleanXml = rawXml2.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+                    const schemaText = schemaXml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
                     const regex2 = /\{\{([^{}]+?)\}\}/g;
                     let match2;
-                    while ((match2 = regex2.exec(cleanXml)) !== null) {
+                    while ((match2 = regex2.exec(schemaText)) !== null) {
                         let varName = match2[1].trim();
                         if(varName.startsWith('#') || varName.startsWith('/') || varName.startsWith('^')) continue;
                         vars.add(varName);
