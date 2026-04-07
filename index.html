@@ -1490,7 +1490,19 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 } else if (type === 'checkbox') {
                     inputHtml = `<div class="flex items-center h-full"><input type="checkbox" data-var="${v}" class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"></div>`;
                 } else if (type === 'select') {
-                    inputHtml = `<input type="text" data-var="${v}" class="w-full text-sm border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm" placeholder="Nhập ${label} (Dropdown)">`;
+                    // Xác định options theo tên biến
+                    let opts = '';
+                    if (v === 'SELECT_VAT') {
+                        opts = '<option value="">-- Chọn VAT --</option><option value="0">0%</option><option value="8">8%</option><option value="10">10%</option>';
+                    } else if (v === 'SELECT_CHIET_KHAU') {
+                        opts = '<option value="0">Không chiết khấu (0%)</option><option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20">20%</option>';
+                    } else if (v === 'SELECT_HINH_THUC_TT') {
+                        opts = '<option value="">-- Chọn hình thức --</option><option value="Chuyển khoản ngân hàng">Chuyển khoản ngân hàng</option><option value="Tiền mặt">Tiền mặt</option><option value="30% đặt cọc, 70% khi giao hàng">30% đặt cọc, 70% khi giao hàng</option><option value="Thanh toán sau 30 ngày">Thanh toán sau 30 ngày</option>';
+                    } else {
+                        const fieldOpts = (fieldConfig.options || []);
+                        opts = '<option value="">-- Chọn --</option>' + fieldOpts.map(o => `<option value="${o}">${o}</option>`).join('');
+                    }
+                    inputHtml = `<select data-var="${v}" class="w-full text-sm border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm bg-white">${opts}</select>`;
                 } else {
                     inputHtml = `<input type="text" data-var="${v}" class="w-full text-sm border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm" placeholder="Nhập ${label}">`;
                 }
@@ -1559,6 +1571,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     } else {
                         formData[e.target.dataset.var] = e.target.value;
                     }
+                    // Tự tính tổng khi thay đổi VAT hoặc chiết khấu
+                    const v2 = e.target.dataset.var;
+                    if (v2 === 'SELECT_VAT' || v2 === 'SELECT_CHIET_KHAU') {
+                        updateTotals();
+                    }
                 });
             });
 
@@ -1570,13 +1587,34 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         function addTableRow(tableName, cols, rowData) {
             const tbody = document.getElementById(`tbody-${tableName}`);
+            if (!tbody) return;
+            const rowIndex = tbody.querySelectorAll('tr').length + 1;
             const tr = document.createElement('tr');
-            
+            tr.className = 'hover:bg-gray-50';
+
+            // Xác định cột tính tiền tự động
+            const isHangHoa = tableName === 'HANG_HOA';
+            const hasSL = cols.includes('NUM_SL');
+            const hasDonGia = cols.includes('NUM_DON_GIA');
+            const hasThanhTien = cols.includes('NUM_THANH_TIEN');
+
             let tds = cols.map(c => {
                 const val = rowData[c] !== undefined ? rowData[c] : '';
-                return `<td class="px-4 py-2 whitespace-nowrap"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 border p-1"></td>`;
+                // STT — chỉ hiển thị, không nhập
+                if (c === 'STT') {
+                    return `<td class="px-3 py-2 text-center text-gray-500 text-sm w-10" data-stt="${rowIndex}">${rowIndex}</td>`;
+                }
+                // NUM_THANH_TIEN — readonly, tự tính
+                if (c === 'NUM_THANH_TIEN') {
+                    return `<td class="px-2 py-2 whitespace-nowrap"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" readonly class="w-full text-sm border-gray-200 bg-gray-50 rounded p-1 text-right font-medium text-blue-700 cursor-default" placeholder="Tự tính"></td>`;
+                }
+                // NUM_ fields — type=number
+                if (c.startsWith('NUM_')) {
+                    return `<td class="px-2 py-2 whitespace-nowrap"><input type="number" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm border-gray-300 rounded p-1 text-right focus:ring-1 focus:ring-blue-400 focus:border-blue-400 border" placeholder="0" min="0"></td>`;
+                }
+                return `<td class="px-2 py-2 whitespace-nowrap"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm border-gray-300 rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400 border p-1" placeholder="${c}"></td>`;
             }).join('');
-            
+
             tr.innerHTML = `
                 ${tds}
                 <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
@@ -1586,31 +1624,56 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             
             tr.querySelector('.remove-row-btn').addEventListener('click', () => {
                 tr.remove();
+                // Cập nhật lại STT
+                tbody.querySelectorAll('tr').forEach((r, i) => {
+                    const sttCell = r.querySelector('[data-stt]');
+                    if (sttCell) { sttCell.textContent = i + 1; sttCell.dataset.stt = i + 1; }
+                });
                 updateTableData(tableName, cols);
+                updateTotals();
             });
-            
+
             tr.querySelectorAll('input').forEach(input => {
-                input.addEventListener('input', () => updateTableData(tableName, cols));
+                input.addEventListener('input', () => {
+                    // Auto-tính NUM_THANH_TIEN = NUM_SL × NUM_DON_GIA
+                    if (input.dataset.col === 'NUM_SL' || input.dataset.col === 'NUM_DON_GIA') {
+                        const row  = input.closest('tr');
+                        const slIn = row.querySelector('[data-col="NUM_SL"]');
+                        const dgIn = row.querySelector('[data-col="NUM_DON_GIA"]');
+                        const ttIn = row.querySelector('[data-col="NUM_THANH_TIEN"]');
+                        if (slIn && dgIn && ttIn) {
+                            const tt = (parseFloat(slIn.value) || 0) * (parseFloat(dgIn.value) || 0);
+                            ttIn.value = formatVND(tt);
+                        }
+                    }
+                    updateTableData(tableName, cols);
+                    updateTotals();
+                });
             });
-            
+
             tbody.appendChild(tr);
-            updateTableData(tableName, cols); // Initial update
+            updateTableData(tableName, cols);
         }
 
         function updateTableData(tableName, cols) {
             const tbody = document.getElementById(`tbody-${tableName}`);
+            if (!tbody) return;
             const rows = tbody.querySelectorAll('tr');
             const tableData = [];
-            
-            rows.forEach(row => {
+
+            rows.forEach((row, idx) => {
                 const rowObj = {};
                 cols.forEach(c => {
-                    const input = row.querySelector(`input[data-col="${c}"]`);
-                    rowObj[c] = input ? input.value : '';
+                    if (c === 'STT') {
+                        rowObj[c] = String(idx + 1);
+                    } else {
+                        const input = row.querySelector(`[data-col="${c}"]`);
+                        rowObj[c] = input ? input.value : '';
+                    }
                 });
                 tableData.push(rowObj);
             });
-            
+
             formData[tableName] = tableData;
         }
 
@@ -1936,6 +1999,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     if (type === 'docx') {
                         saveAs(out, `${fileName}.docx`);
                         showToast("Đã tải xuống file DOCX");
+                    } else if (type === null) {
+                        // Save to Drive - return result directly
+                        return { type: 'docx', blob: out, extension: 'docx',
+                                 mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                 fileName: fileName + '.docx' };
                     } else if (type === 'pdf') {
                         // Client-side PDF generation via mammoth + html2pdf
                         const arrayBuffer = await out.arrayBuffer();
@@ -1970,7 +2038,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         showToast("Đã tải xuống file PDF");
                     }
                     
-                    return { type: 'docx', blob: out, extension: 'docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+                    return { type: 'docx', blob: out, extension: 'docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileName: fileName + '.docx' };
                 }
             } catch (error) {
                 console.error("Error generating document:", error);
@@ -2717,104 +2785,91 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         };
 
         document.getElementById('save-drive-btn').addEventListener('click', async () => {
-            if (!currentTemplateId) {
-                showToast("Vui lòng chọn biểu mẫu trước", "error");
+            if (!currentTemplate) {
+                showToast("Vui lòng chọn biểu mẫu trước", true);
                 return;
             }
-            
+            if (!accessToken) {
+                showToast("Vui lòng đăng nhập Google trước", true);
+                return;
+            }
+
             const btn = document.getElementById('save-drive-btn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<span class="spinner"></span> Đang lưu...';
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner border-white border-t-transparent"></span> Đang lưu...';
             btn.disabled = true;
-            
+
             try {
-                const result = await generateDocument(null); // null type means don't download
-                if (!result) throw new Error("Generation failed");
-                
-                const template = templates.find(t => t.id === currentTemplateId);
-                let customerPart = '';
-                if (selectedCustomer) {
-                    customerPart = `_${selectedCustomer.ten_viet_tat || selectedCustomer.ten_cong_ty}`;
-                }
-                const fileName = `${template.name.replace(/\.(docx|xlsx)$/, '')}${customerPart}_${new Date().getTime()}.${result.extension}`;
-                
-                const appProps = { 
+                const result = await generateDocument(null);
+                if (!result || !result.blob) throw new Error("Không tạo được tài liệu");
+
+                // Build filename
+                const fdKey = Date.now() + '_' + Math.random().toString(36).slice(2,5);
+                localStorage.setItem('docflow_formdata_' + fdKey, JSON.stringify({
+                    ...formData,
+                    customerId: selectedCustomer?.id || null,
+                }));
+
+                const appProps = {
                     docflow: 'generated',
-                    templateName: template.name
+                    templateName: currentTemplate.name,
+                    formDataKey: fdKey,
+                    docNumber: formData['MA_TAI_LIEU'] || '',
+                    ...(selectedCustomer ? { customerName: selectedCustomer.ten_cong_ty } : {}),
                 };
-                
-                if (selectedCustomer) {
-                    appProps.customerName = selectedCustomer.ten_cong_ty;
+
+                const saved = await saveFileToDrive(result.blob, result.fileName || (currentTemplate.name.replace(/\.[^.]+$/, '') + '_' + Date.now() + '.' + result.extension), result.mimeType, appProps);
+
+                if (saved?.id) {
+                    localStorage.setItem('docflow_lastkey_' + saved.id, fdKey);
                 }
-                
-                await saveFileToDrive(result.blob, fileName, result.mimeType, appProps);
-                showToast("Đã lưu tài liệu lên Google Drive thành công!");
-                
-                // Refresh list if we are on the documents view
-                const currentView = Array.from(document.querySelectorAll('.main-view')).find(v => !v.classList.contains('hidden'))?.id;
-                if (currentView === 'documents-view') {
-                    loadGeneratedDocuments();
-                }
+                showToast("Đã lưu lên Google Drive thành công!");
+
+                // Refresh documents list if visible
+                const visibleView = document.querySelector('.main-view:not(.hidden)')?.id;
+                if (visibleView === 'documents-view') loadGeneratedDocuments();
+
             } catch (error) {
-                console.error("Error saving to Drive:", error);
-                showToast("Lỗi khi lưu lên Drive", "error");
+                console.error("Lỗi lưu Drive:", error);
+                showToast("Lỗi lưu Drive: " + (error.message || 'unknown'), true);
             } finally {
-                btn.innerHTML = originalText;
+                btn.innerHTML = originalHtml;
                 btn.disabled = false;
             }
         });
 
         async function saveFileToDrive(blob, fileName, mimeType, appProperties = null, fileId = null) {
-            if (!gapiInited || !tokenClient) {
-                throw new Error("Google API not initialized");
+            if (!accessToken) {
+                throw new Error("Chưa đăng nhập Google. Vui lòng đăng nhập lại.");
             }
-            
-            return new Promise((resolve, reject) => {
-                tokenClient.callback = async (resp) => {
-                    if (resp.error !== undefined) {
-                        reject(resp);
-                        return;
-                    }
-                    
-                    try {
-                        const metadata = {
-                            name: fileName,
-                            mimeType: mimeType
-                        };
-                        
-                        if (appProperties) {
-                            metadata.appProperties = appProperties;
-                        }
-                        
-                        const form = new FormData();
-                        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                        form.append('file', blob);
-                        
-                        const url = fileId 
-                            ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
-                            : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-                        const method = fileId ? 'PATCH' : 'POST';
 
-                        const response = await fetch(url, {
-                            method: method,
-                            headers: new Headers({ 'Authorization': 'Bearer ' + gapi.client.getToken().access_token }),
-                            body: form,
-                        });
-                        
-                        const data = await response.json();
-                        if (data.error) throw data.error;
-                        resolve(data);
-                    } catch (err) {
-                        reject(err);
-                    }
-                };
-                
-                if (gapi.client.getToken() === null) {
-                    tokenClient.requestAccessToken({prompt: 'consent'});
-                } else {
-                    tokenClient.requestAccessToken({prompt: ''});
-                }
+            const metadata = { name: fileName, mimeType };
+            if (appProperties) metadata.appProperties = appProperties;
+
+            // Thêm vào folder đúng nếu đã có cấu trúc folder
+            const targetFolderId = (typeof getFolderIdForDoc === 'function')
+                ? getFolderIdForDoc(fileName) : null;
+            if (targetFolderId && !fileId) metadata.parents = [targetFolderId];
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', blob);
+
+            const url = fileId
+                ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
+                : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+
+            const response = await fetch(url, {
+                method: fileId ? 'PATCH' : 'POST',
+                headers: { 'Authorization': 'Bearer ' + accessToken },
+                body: form,
             });
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error.message || JSON.stringify(data.error));
+            }
+            return data;
         }
 
         // --- COMPUTED FIELDS LOGIC ---
@@ -2863,27 +2918,67 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         function computeFields(data) {
             const computed = { ...data };
-            
+
             const today = new Date();
             computed['NGAY_THANG_NAM'] = formatDateLongVN(today);
-            computed['MA_TAI_LIEU'] = `DOC-${Date.now().toString().slice(-6)}`;
-            
-            let sum = 0;
+            if (!computed['MA_TAI_LIEU']) {
+                computed['MA_TAI_LIEU'] = 'BG-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-4);
+            }
+
+            // 1. Tổng tiền hàng = tổng NUM_THANH_TIEN trong TABLE_
+            let tongHang = 0;
             for (const key in data) {
                 if (key.startsWith('TABLE_') && Array.isArray(data[key])) {
-                    data[key].forEach(row => {
-                        const sl = parseFloat(row.NUM_SL || 0);
-                        const dg = parseFloat(row.NUM_DON_GIA || row.NUM_GIA || 0);
-                        sum += sl * dg;
+                    data[key].forEach((row, idx) => {
+                        // Tính lại thành tiền từng dòng (dù đã hiển thị trên form)
+                        const sl = parseFloat(row['NUM_SL']  || 0);
+                        const dg = parseFloat(row['NUM_DON_GIA'] || 0);
+                        const tt = sl * dg;
+                        row['NUM_THANH_TIEN'] = formatVND(tt);
+                        row['STT'] = String(idx + 1);
+                        tongHang += tt;
                     });
-                } else if (key.startsWith('NUM_') && !isNaN(parseFloat(data[key]))) {
-                    sum += parseFloat(data[key]);
                 }
             }
-            computed['TONG_CONG'] = formatVND(sum);
-            computed['TIEN_BANG_CHU'] = numberToVietnameseWords(sum);
+            computed['TONG_CONG'] = formatVND(tongHang);
+
+            // 2. Chiết khấu
+            const ckPct = parseFloat(data['SELECT_CHIET_KHAU'] || 0);
+            const ckTien = tongHang * ckPct / 100;
+            computed['CHIET_KHAU_TIEN'] = formatVND(ckTien);
+
+            // 3. VAT
+            const vatPct  = parseFloat(data['SELECT_VAT'] || 0);
+            const afterCK = tongHang - ckTien;
+            const vatTien = afterCK * vatPct / 100;
+            computed['VAT_TIEN'] = formatVND(vatTien);
+
+            // 4. Tổng thanh toán
+            const tongTT = afterCK + vatTien;
+            computed['TONG_THANH_TOAN'] = formatVND(tongTT);
+
+            // 5. Số tiền bằng chữ
+            computed['TIEN_BANG_CHU'] = numberToVietnameseWords(tongTT);
+
+            // 6. Ngày tháng năm đầy đủ cho chữ ký
+            computed['DATE_NGAY_LAP'] = computed['DATE_NGAY_LAP'] || today.toISOString().split('T')[0];
 
             return computed;
+        }
+
+        // Hàm updateTotals — gọi sau mỗi thay đổi trong bảng hàng hóa
+        function updateTotals() {
+            const computed = computeFields(formData);
+
+            // Cập nhật các ô tổng trên form (nếu đang hiển thị)
+            const fields = ['TONG_CONG','CHIET_KHAU_TIEN','VAT_TIEN','TONG_THANH_TOAN','TIEN_BANG_CHU'];
+            fields.forEach(f => {
+                const el = document.querySelector(`[data-var="${f}"]`);
+                if (el) el.value = computed[f] || '';
+            });
+
+            // Đồng bộ lại formData
+            fields.forEach(f => { formData[f] = computed[f] || ''; });
         }
 
         // --- SETTINGS LOGIC ---
