@@ -1316,7 +1316,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const tables = {};
                 
                 if (template.type === 'xlsx') {
-                    const workbook = XLSX.read(new Uint8Array(template.content), { type: 'array' });
+                    const xlsxData = template.content instanceof ArrayBuffer
+                        ? new Uint8Array(template.content)
+                        : template.content;
+                    const workbook = XLSX.read(xlsxData, { type: 'array' });
                     const regex = /\{\{([^{}]+?)\}\}/g;
                     
                     workbook.SheetNames.forEach(sheetName => {
@@ -1399,7 +1402,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         console.error('PizZip error:', zipErr);
                         // Fallback: dùng mammoth nếu PizZip fail
                         try {
-                            const r = await mammoth.extractRawText({ arrayBuffer: template.content });
+                            const mamBuf = template.content instanceof ArrayBuffer
+                                ? template.content
+                                : template.content.buffer || template.content;
+                            const r = await mammoth.extractRawText({ arrayBuffer: mamBuf });
                             rawXml = r.value || '';
                         } catch(mamErr) {
                             showToast('Lỗi đọc file DOCX: ' + (mamErr.message || 'file bị hỏng'), true);
@@ -1415,7 +1421,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     let match;
                     let currentTable = null;
 
-                    while ((match = regex.exec(docText)) !== null) {
+                    while ((match = regex.exec(cleanText)) !== null) {
                         let varName = match[1].trim();
                         if (varName.startsWith('#TABLE_')) {
                             currentTable = varName.substring(1);
@@ -1690,7 +1696,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const fileName = `${baseName}${customerPart}_${new Date().getTime()}`;
 
                 if (currentTemplate.type === 'xlsx') {
-                    const workbook = XLSX.read(new Uint8Array(currentTemplate.content), { type: 'array' });
+                    const xlsxData2 = currentTemplate.content instanceof ArrayBuffer
+                        ? new Uint8Array(currentTemplate.content)
+                        : currentTemplate.content;
+                    const workbook = XLSX.read(xlsxData2, { type: 'array' });
                     
                     workbook.SheetNames.forEach(sheetName => {
                         const sheet = workbook.Sheets[sheetName];
@@ -1930,7 +1939,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     } else if (type === 'pdf') {
                         // Client-side PDF generation via mammoth + html2pdf
                         const arrayBuffer = await out.arrayBuffer();
-                        const result = await mammoth.convertToHtml({ arrayBuffer: currentTemplate.content });
+                        const pdfBuf = currentTemplate.content instanceof ArrayBuffer
+                            ? currentTemplate.content
+                            : currentTemplate.content.buffer || currentTemplate.content;
+                        const result = await mammoth.convertToHtml({ arrayBuffer: pdfBuf });
                         
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = result.value;
@@ -3089,7 +3101,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const vars = new Set();
                 
                 if (template.type === 'xlsx') {
-                    const workbook = XLSX.read(new Uint8Array(template.content), { type: 'array' });
+                    const xlsxData = template.content instanceof ArrayBuffer
+                        ? new Uint8Array(template.content)
+                        : template.content;
+                    const workbook = XLSX.read(xlsxData, { type: 'array' });
                     const regex = /\{\{([^{}]+?)\}\}/g;
                     
                     workbook.SheetNames.forEach(sheetName => {
