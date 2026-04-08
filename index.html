@@ -78,6 +78,9 @@
                     <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition" data-view="customers-view">
                         Khách hàng
                     </button>
+                    <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition" data-view="add-customer-view">
+                        Thêm khách hàng
+                    </button>
                     <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition" data-view="documents-view">
                         Tài liệu đã tạo
                     </button>
@@ -377,6 +380,58 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Customer View -->
+            <div id="add-customer-view" class="main-view hidden bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+                <div class="max-w-4xl mx-auto">
+                    <div class="flex items-center gap-3 mb-8">
+                        <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">Thêm Khách Hàng Mới</h2>
+                            <p class="text-sm text-gray-500">Nhập thông tin chi tiết để lưu vào danh sách hệ thống</p>
+                        </div>
+                    </div>
+                    
+                    <div id="add-customer-page-container" class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                        <!-- Form will be moved here when tab active -->
+                        <p class="text-gray-500 italic text-center py-10">Đang tải biểu mẫu...</p>
+                    </div>
+                    
+                    <div class="mt-8 flex justify-end gap-3">
+                        <button id="save-customer-page-btn" class="px-10 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95">
+                            Lưu khách hàng
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Customer View -->
+            <div id="add-customer-view" class="main-view hidden bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+                <div class="max-w-4xl mx-auto">
+                    <div class="flex items-center gap-3 mb-8">
+                        <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">Thêm Khách Hàng Mới</h2>
+                            <p class="text-sm text-gray-500">Nhập thông tin chi tiết để lưu vào danh sách hệ thống</p>
+                        </div>
+                    </div>
+                    
+                    <div id="add-customer-page-container" class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                        <!-- Form will be moved here when tab active -->
+                        <p class="text-gray-500 italic text-center py-10">Đang tải biểu mẫu...</p>
+                    </div>
+                    
+                    <div class="mt-8 flex justify-end gap-3">
+                        <button id="save-customer-page-btn" class="px-10 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95">
+                            Lưu khách hàng
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1233,12 +1288,30 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     },
                 });
                 gisInited = true;
+
+                // Tự động khôi phục phiên đăng nhập nếu còn hạn (tối thiểu 30p)
+                const savedToken = localStorage.getItem('docflow_access_token');
+                const expiry = localStorage.getItem('docflow_token_expiry');
+                if (savedToken && expiry && Date.now() < parseInt(expiry)) {
+                    accessToken = savedToken;
+                    // Đợi GAPI init xong rồi mới chạy handleAuthSuccess
+                    const checkGapi = setInterval(() => {
+                        if (gapiInited) {
+                            clearInterval(checkGapi);
+                            handleAuthSuccess();
+                        }
+                    }, 100);
+                }
             } catch (e) {
                 console.error("Error initializing GIS", e);
             }
         }
 
         async function handleAuthSuccess() {
+            // Lưu token vào localStorage để duy trì phiên
+            localStorage.setItem('docflow_access_token', accessToken);
+            localStorage.setItem('docflow_token_expiry', Date.now() + 3500 * 1000); // 1 giờ
+
             document.getElementById('auth-btn').classList.add('hidden');
             document.getElementById('user-info').classList.remove('hidden');
             
@@ -1281,17 +1354,63 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 document.querySelectorAll('.main-view').forEach(v => v.classList.add('hidden'));
 
                 // Show target view
-                const targetViewId = e.currentTarget.dataset.target;
-                document.getElementById(targetViewId).classList.remove('hidden');
+                const targetViewId = e.currentTarget.dataset.view;
+                if (targetViewId) {
+                    document.getElementById(targetViewId).classList.remove('hidden');
+                }
                 
                 // Special handling for specific views
                 if (targetViewId === 'customers-view') {
                     renderCustomerList();
+                } else if (targetViewId === 'add-customer-view') {
+                    openAddCustomerTab();
                 } else if (targetViewId === 'documents-view') {
                     if (!isDemoMode) loadGeneratedDocuments();
                     else renderDocumentList();
                 }
             });
+        });
+
+        function openCustomerModal() {
+            document.getElementById('customer-modal').classList.remove('hidden');
+        }
+
+        function openAddCustomerTab() {
+            const container = document.getElementById('add-customer-page-container');
+            const form = document.getElementById('customer-form');
+            
+            // Move form to tab container
+            container.innerHTML = '';
+            container.appendChild(form);
+            
+            // Reset form
+            form.reset();
+            document.getElementById('customer-id').value = '';
+            document.getElementById('customer-modal-title').textContent = 'Thêm Khách Hàng Mới';
+            document.getElementById('contacts-container').innerHTML = '';
+            addContactField(); // Add first empty contact
+            
+            // Hide delete button in tab mode
+            document.getElementById('delete-customer-btn').classList.add('hidden');
+        }
+
+        // Cần cập nhật lại modal khi đóng tab hoặc mở modal
+        document.getElementById('add-customer-btn').addEventListener('click', () => {
+            const modalBody = document.querySelector('#customer-modal .flex-1.overflow-y-auto.p-8');
+            const form = document.getElementById('customer-form');
+            modalBody.appendChild(form);
+            
+            document.getElementById('customer-modal-title').textContent = 'Thêm Khách Hàng Mới';
+            form.reset();
+            document.getElementById('customer-id').value = '';
+            document.getElementById('contacts-container').innerHTML = '';
+            addContactField();
+            document.getElementById('delete-customer-btn').classList.add('hidden');
+            document.getElementById('customer-modal').classList.remove('hidden');
+        });
+
+        document.getElementById('save-customer-page-btn').addEventListener('click', () => {
+            document.getElementById('save-customer-btn').click();
         });
 
         // --- EVENT LISTENERS ---
@@ -1371,6 +1490,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         });
 
         document.getElementById('signout-btn').addEventListener('click', () => {
+            localStorage.removeItem('docflow_access_token');
+            localStorage.removeItem('docflow_token_expiry');
             if (isDemoMode) {
                 isDemoMode = false;
                 document.getElementById('login-overlay').classList.remove('hidden');
@@ -1613,11 +1734,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        template.content = e.target.result;
+                        template.content = e.target.result; // ArrayBuffer
                         template.type = template.name.endsWith('.xlsx') ? 'xlsx' : 'docx';
                         extractVariablesAndBuildForm(template);
                     };
-                    reader.readAsBinaryString(blob);
+                    reader.readAsArrayBuffer(blob);
                     return;
                 } catch (err) {
                     console.error("Error fetching file content", err);
@@ -1728,7 +1849,16 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 } else {
                     const zip = new PizZip(template.content);
                     const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-                    const text = doc.getFullText();
+                    
+                    // Lấy text thô từ XML để tìm biến chính xác hơn (tránh Word chia tag giữa { và })
+                    let text = "";
+                    try {
+                        const xmlContent = zip.files["word/document.xml"].asText();
+                        // Loại bỏ các tag XML nhưng giữ lại nội dung để tìm biến
+                        text = xmlContent.replace(/<[^>]+>/g, '');
+                    } catch(e) {
+                        text = doc.getFullText();
+                    }
                     
                     // Regex to find {variables}
                     const regex = /\{([^{}]+)\}/g;
