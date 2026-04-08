@@ -1187,6 +1187,24 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 renderTemplateList();
                 selectTemplate(templateObj);
                 showToast('Đã tải lên: ' + file.name);
+
+                // Upload lên Drive folder _templates nếu đã đăng nhập
+                if (accessToken && driveTemplateFolderId) {
+                    try {
+                        const blob = new Blob([arrayBuffer], { type: file.type });
+                        const saved = await saveFileToDrive(blob, file.name, file.type, { docflow: 'template' });
+                        if (saved && saved.id) {
+                            templateObj.id = saved.id;
+                            templateObj.source = 'drive';
+                            showToast('Đã lưu template lên Drive: _templates/' + file.name);
+                        }
+                    } catch(e) {
+                        console.warn('Lưu template lên Drive thất bại (dùng local):', e.message);
+                    }
+                } else if (accessToken && !driveTemplateFolderId) {
+                    showToast('Template lưu local. Vào Settings để kết nối Drive.', false);
+                }
+
                 event.target.value = '';
             };
             reader.readAsArrayBuffer(file);
@@ -1458,7 +1476,16 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     }
                 }
                 
-                templateVariables = Array.from(vars);
+                // Loại bỏ TABLE_ keys khỏi vars (chúng thuộc tables)
+                const finalVars = Array.from(vars).filter(v => !v.startsWith('TABLE_'));
+
+                // Nếu TABLE_HANG_HOA xuất hiện trong vars nhưng chưa có trong tables
+                // (trường hợp template dùng {{TABLE_HANG_HOA}} thay vì {#TABLE_HANG_HOA})
+                if (vars.has('TABLE_HANG_HOA') && !tables['TABLE_HANG_HOA']) {
+                    tables['TABLE_HANG_HOA'] = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU'];
+                }
+
+                templateVariables = finalVars;
                 templateTables = tables;
                 buildDynamicForm();
 
@@ -1528,69 +1555,67 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 formContainer.appendChild(div);
             });
 
-            // Render tables
-            for (let [tableName, cols] of Object.entries(templateTables)) {
-                // Nếu cols rỗng → dùng cột mặc định theo tên bảng
+            // Render tables từ template
+            const allTables = { ...templateTables };
+
+            // Nếu template docx mà chưa có bảng HANG_HOA → tự thêm
+            if (currentTemplate && currentTemplate.type === 'docx' && !allTables['TABLE_HANG_HOA'] && !allTables['HANG_HOA']) {
+                allTables['TABLE_HANG_HOA'] = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU'];
+            }
+
+            const COL_LABELS = {
+                STT:'STT', TEN_HANG:'Tên hàng hóa / Dịch vụ',
+                DVT:'ĐVT', NUM_SL:'Số lượng',
+                NUM_DON_GIA:'Đơn giá (VNĐ)', NUM_THANH_TIEN:'Thành tiền (VNĐ)',
+                GHI_CHU:'Ghi chú', TEN:'Tên', SO_LUONG:'Số lượng'
+            };
+
+            for (let [tableName, cols] of Object.entries(allTables)) {
                 if (!cols || cols.length === 0) {
-                    if (tableName === 'HANG_HOA' || tableName === 'TABLE_HANG_HOA') {
-                        cols = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU'];
-                    } else {
-                        cols = ['STT','TEN','SO_LUONG','GHI_CHU'];
-                    }
+                    cols = tableName.includes('HANG') 
+                        ? ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU']
+                        : ['STT','TEN','SO_LUONG','GHI_CHU'];
                 }
 
-                // Label hiển thị cho từng cột
-                const colLabels = {
-                    STT: 'STT', TEN_HANG: 'Tên hàng hóa / Dịch vụ',
-                    DVT: 'ĐVT', NUM_SL: 'Số lượng',
-                    NUM_DON_GIA: 'Đơn giá (VNĐ)', NUM_THANH_TIEN: 'Thành tiền (VNĐ)',
-                    GHI_CHU: 'Ghi chú', TEN: 'Tên', SO_LUONG: 'Số lượng'
-                };
-
                 const tableDiv = document.createElement('div');
-                tableDiv.className = "col-span-full mt-4 border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm";
+                tableDiv.className = 'col-span-full mt-2';
 
-                let ths = cols.map(c => {
-                    const lbl = colLabels[c] || c;
-                    const w = c === 'STT' ? 'w-10' : c === 'NUM_THANH_TIEN' || c === 'NUM_DON_GIA' ? 'w-36' : c === 'NUM_SL' || c === 'DVT' ? 'w-20' : '';
-                    return `<th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide ${w}">${lbl}</th>`;
+                const ths = cols.map(c => {
+                    const lbl = COL_LABELS[c] || c;
+                    const minW = c==='STT' ? 'min-width:40px' : c==='NUM_THANH_TIEN'||c==='NUM_DON_GIA' ? 'min-width:130px' : c==='NUM_SL'||c==='DVT' ? 'min-width:80px' : 'min-width:160px';
+                    return `<th style="${minW}" class="px-3 py-2 text-left text-xs font-semibold text-white">${lbl}</th>`;
                 }).join('');
 
-                tableDiv.innerHTML = \`
-                    <div class="bg-blue-50 px-4 py-3 border-b border-blue-100 flex justify-between items-center">
-                        <div class="flex items-center gap-2">
-                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 6h18M3 14h18M3 18h18"/></svg>
-                            <h3 class="text-sm font-semibold text-blue-800">\${tableName.replace('TABLE_','').replace(/_/g,' ')}</h3>
-                        </div>
-                        <button type="button" class="add-row-btn text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium flex items-center gap-1" data-table="\${tableName}">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            Thêm dòng
+                tableDiv.innerHTML = `
+                    <div class="bg-blue-600 px-4 py-2.5 flex justify-between items-center rounded-t-lg">
+                        <span class="text-sm font-semibold text-white flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 6h18M3 14h18M3 18h18"/></svg>
+                            Bảng hàng hóa / dịch vụ
+                        </span>
+                        <button type="button" class="add-row-btn bg-white text-blue-700 text-xs px-3 py-1 rounded-md hover:bg-blue-50 font-semibold" data-table="${tableName}">
+                            + Thêm dòng
                         </button>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full" id="table-\${tableName}">
-                            <thead class="bg-gray-50 border-b border-gray-200">
-                                <tr>\${ths}<th class="px-2 py-2.5 w-8"></th></tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-100" id="tbody-\${tableName}"></tbody>
-                        </table>
+                    <div class="border border-gray-200 rounded-b-lg overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full" id="table-${tableName}">
+                                <thead><tr class="bg-gray-700">${ths}<th class="w-8 bg-gray-700"></th></tr></thead>
+                                <tbody class="divide-y divide-gray-100 bg-white" id="tbody-${tableName}"></tbody>
+                            </table>
+                        </div>
+                        <div id="totals-${tableName}" class="border-t border-gray-200 bg-gray-50 px-4 py-2 text-right text-sm space-y-0.5"></div>
                     </div>
-                    <div class="px-4 py-2 bg-gray-50 border-t border-gray-100 text-xs text-gray-400">
-                        Thành tiền = Số lượng × Đơn giá (tự tính)
-                    </div>
-                \`;
+                `;
                 formContainer.appendChild(tableDiv);
 
-                // Thêm dòng đầu hoặc restore data
                 if (formData[tableName] && Array.isArray(formData[tableName]) && formData[tableName].length > 0) {
                     formData[tableName].forEach(rowData => addTableRow(tableName, cols, rowData));
                 } else {
                     addTableRow(tableName, cols, {});
+                    addTableRow(tableName, cols, {});
                 }
 
-                tableDiv.querySelector('.add-row-btn').addEventListener('click', () => {
-                    addTableRow(tableName, cols, {});
-                });
+                tableDiv.querySelector('.add-row-btn').addEventListener('click', () => addTableRow(tableName, cols, {}));
             }
 
             // Restore previous data if matches (for normal variables)
@@ -2921,9 +2946,16 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const metadata = { name: fileName, mimeType };
             if (appProperties) metadata.appProperties = appProperties;
 
-            // Thêm vào folder đúng nếu đã có cấu trúc folder
-            const targetFolderId = (typeof getFolderIdForDoc === 'function')
-                ? getFolderIdForDoc(fileName) : null;
+            // Xác định folder đích
+            let targetFolderId = null;
+            const isTemplate = appProperties && appProperties.docflow === 'template';
+            if (isTemplate && driveTemplateFolderId) {
+                targetFolderId = driveTemplateFolderId;
+            } else if (!isTemplate && typeof getFolderIdForDoc === 'function') {
+                targetFolderId = getFolderIdForDoc(fileName);
+            } else {
+                targetFolderId = driveRootFolderId || null;
+            }
             if (targetFolderId && !fileId) metadata.parents = [targetFolderId];
 
             const form = new FormData();
@@ -3041,19 +3073,41 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             return computed;
         }
 
-        // Hàm updateTotals — gọi sau mỗi thay đổi trong bảng hàng hóa
         function updateTotals() {
             const computed = computeFields(formData);
 
-            // Cập nhật các ô tổng trên form (nếu đang hiển thị)
-            const fields = ['TONG_CONG','CHIET_KHAU_TIEN','VAT_TIEN','TONG_THANH_TOAN','TIEN_BANG_CHU'];
-            fields.forEach(f => {
+            // Cập nhật các input field tổng tiền trên form
+            const autoFields = ['TONG_CONG','CHIET_KHAU_TIEN','VAT_TIEN','TONG_THANH_TOAN','TIEN_BANG_CHU'];
+            autoFields.forEach(f => {
                 const el = document.querySelector(`[data-var="${f}"]`);
-                if (el) el.value = computed[f] || '';
+                if (el) { el.value = computed[f] || ''; el.classList.add('bg-yellow-50'); }
+                formData[f] = computed[f] || '';
             });
 
-            // Đồng bộ lại formData
-            fields.forEach(f => { formData[f] = computed[f] || ''; });
+            // Hiển thị totals dưới bảng hàng hóa
+            const totalsDiv = document.getElementById('totals-TABLE_HANG_HOA') || document.getElementById('totals-HANG_HOA');
+            if (totalsDiv) {
+                const ck = parseFloat(formData['SELECT_CHIET_KHAU'] || 0);
+                const vat = parseFloat(formData['SELECT_VAT'] || 0);
+                totalsDiv.innerHTML = `
+                    <div class="flex justify-end gap-8 text-sm py-1">
+                        <span class="text-gray-500">Tổng tiền hàng:</span>
+                        <span class="font-medium text-gray-800 min-w-[120px] text-right">${computed['TONG_CONG'] || '0'} VNĐ</span>
+                    </div>
+                    ${ck > 0 ? `<div class="flex justify-end gap-8 text-sm py-0.5">
+                        <span class="text-gray-500">Chiết khấu (${ck}%):</span>
+                        <span class="font-medium text-red-600 min-w-[120px] text-right">- ${computed['CHIET_KHAU_TIEN'] || '0'} VNĐ</span>
+                    </div>` : ''}
+                    ${vat > 0 ? `<div class="flex justify-end gap-8 text-sm py-0.5">
+                        <span class="text-gray-500">Thuế VAT (${vat}%):</span>
+                        <span class="font-medium text-gray-700 min-w-[120px] text-right">+ ${computed['VAT_TIEN'] || '0'} VNĐ</span>
+                    </div>` : ''}
+                    <div class="flex justify-end gap-8 text-sm py-1.5 border-t border-gray-200 mt-1">
+                        <span class="font-bold text-gray-800">TỔNG THANH TOÁN:</span>
+                        <span class="font-bold text-blue-700 text-base min-w-[120px] text-right">${computed['TONG_THANH_TOAN'] || '0'} VNĐ</span>
+                    </div>
+                `;
+            }
         }
 
         // --- SETTINGS LOGIC ---
