@@ -1416,30 +1416,44 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     // Strip XML tags để lấy text thuần
                     const cleanText = rawXml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
-                    // Regex tìm {{BIEN}} — double braces
-                    const regex = /\{\{([^{}]+?)\}\}/g;
-                    let match;
+                    // Nhận cả {VAR} (single) và {{VAR}} (double) — docxtemplater dùng cả 2
+                    // Ưu tiên double trước để không trùng lặp
+                    const regexDouble = /\{\{([^{}]+?)\}\}/g;
+                    const regexSingle = /(?<!\{)\{([^{}]+?)\}(?!\})/g;
+
                     let currentTable = null;
 
-                    while ((match = regex.exec(cleanText)) !== null) {
-                        let varName = match[1].trim();
+                    // Hàm xử lý 1 varName
+                    function processVar(varName) {
+                        varName = varName.trim();
                         if (varName.startsWith('#TABLE_')) {
-                            currentTable = varName.substring(1);
-                            tables[currentTable] = [];
-                            continue;
+                            currentTable = varName.substring(1); // "TABLE_HANG_HOA"
+                            if (!tables[currentTable]) tables[currentTable] = [];
+                            return;
                         }
                         if (varName.startsWith('/TABLE_')) {
                             currentTable = null;
-                            continue;
+                            return;
                         }
-                        if(varName.startsWith('#') || varName.startsWith('/') || varName.startsWith('^')) continue;
-
+                        if (varName.startsWith('#') || varName.startsWith('/') || varName.startsWith('^')) return;
                         if (currentTable) {
-                            if (!tables[currentTable].includes(varName)) {
+                            if (!tables[currentTable].includes(varName))
                                 tables[currentTable].push(varName);
-                            }
                         } else {
                             vars.add(varName);
+                        }
+                    }
+
+                    // Đánh dấu vị trí double-brace để không regex single-brace lại
+                    const doubleBracePositions = new Set();
+                    let m;
+                    while ((m = regexDouble.exec(cleanText)) !== null) {
+                        for (let i = m.index; i < m.index + m[0].length; i++) doubleBracePositions.add(i);
+                        processVar(m[1]);
+                    }
+                    while ((m = regexSingle.exec(cleanText)) !== null) {
+                        if (!doubleBracePositions.has(m.index)) {
+                            processVar(m[1]);
                         }
                     }
                 }
@@ -1515,40 +1529,65 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             });
 
             // Render tables
-            for (const [tableName, cols] of Object.entries(templateTables)) {
+            for (let [tableName, cols] of Object.entries(templateTables)) {
+                // Nếu cols rỗng → dùng cột mặc định theo tên bảng
+                if (!cols || cols.length === 0) {
+                    if (tableName === 'HANG_HOA' || tableName === 'TABLE_HANG_HOA') {
+                        cols = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU'];
+                    } else {
+                        cols = ['STT','TEN','SO_LUONG','GHI_CHU'];
+                    }
+                }
+
+                // Label hiển thị cho từng cột
+                const colLabels = {
+                    STT: 'STT', TEN_HANG: 'Tên hàng hóa / Dịch vụ',
+                    DVT: 'ĐVT', NUM_SL: 'Số lượng',
+                    NUM_DON_GIA: 'Đơn giá (VNĐ)', NUM_THANH_TIEN: 'Thành tiền (VNĐ)',
+                    GHI_CHU: 'Ghi chú', TEN: 'Tên', SO_LUONG: 'Số lượng'
+                };
+
                 const tableDiv = document.createElement('div');
-                tableDiv.className = "col-span-full mt-4 border border-gray-200 rounded-lg overflow-hidden bg-white";
-                
-                let ths = cols.map(c => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${c}</th>`).join('');
-                
-                tableDiv.innerHTML = `
-                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                        <h3 class="text-sm font-semibold text-gray-700">${tableName}</h3>
-                        <button type="button" class="add-row-btn text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200" data-table="${tableName}">+ Thêm dòng</button>
+                tableDiv.className = "col-span-full mt-4 border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm";
+
+                let ths = cols.map(c => {
+                    const lbl = colLabels[c] || c;
+                    const w = c === 'STT' ? 'w-10' : c === 'NUM_THANH_TIEN' || c === 'NUM_DON_GIA' ? 'w-36' : c === 'NUM_SL' || c === 'DVT' ? 'w-20' : '';
+                    return `<th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide ${w}">${lbl}</th>`;
+                }).join('');
+
+                tableDiv.innerHTML = \`
+                    <div class="bg-blue-50 px-4 py-3 border-b border-blue-100 flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 6h18M3 14h18M3 18h18"/></svg>
+                            <h3 class="text-sm font-semibold text-blue-800">\${tableName.replace('TABLE_','').replace(/_/g,' ')}</h3>
+                        </div>
+                        <button type="button" class="add-row-btn text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium flex items-center gap-1" data-table="\${tableName}">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Thêm dòng
+                        </button>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200" id="table-${tableName}">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    ${ths}
-                                    <th class="px-4 py-2 w-10"></th>
-                                </tr>
+                        <table class="min-w-full" id="table-\${tableName}">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>\${ths}<th class="px-2 py-2.5 w-8"></th></tr>
                             </thead>
-                            <tbody class="bg-white divide-y divide-gray-200" id="tbody-${tableName}">
-                                <!-- Rows will be added here -->
-                            </tbody>
+                            <tbody class="bg-white divide-y divide-gray-100" id="tbody-\${tableName}"></tbody>
                         </table>
                     </div>
-                `;
+                    <div class="px-4 py-2 bg-gray-50 border-t border-gray-100 text-xs text-gray-400">
+                        Thành tiền = Số lượng × Đơn giá (tự tính)
+                    </div>
+                \`;
                 formContainer.appendChild(tableDiv);
-                
-                // Add initial row or restore data
-                if (formData[tableName] && Array.isArray(formData[tableName])) {
+
+                // Thêm dòng đầu hoặc restore data
+                if (formData[tableName] && Array.isArray(formData[tableName]) && formData[tableName].length > 0) {
                     formData[tableName].forEach(rowData => addTableRow(tableName, cols, rowData));
                 } else {
                     addTableRow(tableName, cols, {});
                 }
-                
+
                 tableDiv.querySelector('.add-row-btn').addEventListener('click', () => {
                     addTableRow(tableName, cols, {});
                 });
@@ -1972,45 +2011,81 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         throw zipErr;
                     }
 
-                    const doc = new window.docxtemplater(zip, {
-                        paragraphLoop: true,
-                        linebreaks: true,
-                        delimiters: { start: '{{', end: '}}' },
-                        nullGetter: () => '',          // Biến không có giá trị → chuỗi rỗng
-                        errorLogging: false,
-                    });
-
-                    try {
-                        doc.render(finalData);
-                    } catch(renderErr) {
-                        const errMsg = renderErr.properties?.errors
-                            ?.map(e => e.properties?.id || e.message).join(', ')
-                            || renderErr.message || 'Lỗi render';
-                        showToast('Lỗi ghép dữ liệu vào template: ' + errMsg, true);
-                        console.error('docxtemplater render error:', renderErr);
-                        throw renderErr;
+                    // Chuẩn bị data: TABLE_HANG_HOA → HANG_HOA (khớp với {#HANG_HOA} trong template)
+                    // Và map các key NUMBER sang string để tránh lỗi type
+                    const templateData = {};
+                    for (const [k, v] of Object.entries(finalData)) {
+                        if (k.startsWith('TABLE_')) {
+                            // {#HANG_HOA} — bỏ prefix TABLE_
+                            const shortKey = k.substring(6);
+                            templateData[shortKey] = Array.isArray(v) ? v : [];
+                            // Giữ cả key gốc cho {{TABLE_HANG_HOA}} style
+                            templateData[k] = templateData[shortKey];
+                        } else {
+                            templateData[k] = (v === null || v === undefined) ? '' : String(v);
+                        }
                     }
 
-                    const out = doc.getZip().generate({
-                        type: "blob",
-                        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    });
+                    // Thử single-brace delimiters trước (cho template dùng {VAR})
+                    // Nếu fail thì thử double-brace
+                    let renderOk = false;
+                    for (const delims of [{ start: '{', end: '}' }, { start: '{{', end: '}}' }]) {
+                        try {
+                            const zipCopy = new PizZip(currentTemplate.content);
+                            const docTry = new window.docxtemplater(zipCopy, {
+                                paragraphLoop: true,
+                                linebreaks: true,
+                                delimiters: delims,
+                                nullGetter: () => '',
+                                errorLogging: false,
+                            });
+                            docTry.render(templateData);
+                            const outTry = docTry.getZip().generate({
+                                type: 'blob',
+                                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            });
+                            if (type === 'docx') {
+                                saveAs(outTry, fileName + '.docx');
+                                showToast('Đã tải xuống file DOCX');
+                            } else if (type === null) {
+                                return { type:'docx', blob:outTry, extension:'docx',
+                                         mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                         fileName: fileName + '.docx' };
+                            }
+                            renderOk = true;
+                            break;
+                        } catch(tryErr) {
+                            console.warn('Render với delimiters', delims.start, 'thất bại:', tryErr.message || tryErr);
+                        }
+                    }
+                    if (!renderOk) {
+                        showToast('Lỗi render template. Kiểm tra cú pháp biến trong file Word.', true);
+                        return null;
+                    }
 
-                    if (type === 'docx') {
-                        saveAs(out, `${fileName}.docx`);
-                        showToast("Đã tải xuống file DOCX");
-                    } else if (type === null) {
-                        // Save to Drive - return result directly
-                        return { type: 'docx', blob: out, extension: 'docx',
-                                 mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                                 fileName: fileName + '.docx' };
-                    } else if (type === 'pdf') {
-                        // Client-side PDF generation via mammoth + html2pdf
-                        const arrayBuffer = await out.arrayBuffer();
-                        const pdfBuf = currentTemplate.content instanceof ArrayBuffer
-                            ? currentTemplate.content
-                            : currentTemplate.content.buffer || currentTemplate.content;
-                        const result = await mammoth.convertToHtml({ arrayBuffer: pdfBuf });
+                    // Dummy doc/out để không lỗi code phía sau
+                    const doc = { render: () => {} };
+
+                    if (type === 'pdf') {
+                        // PDF: render docx first, then convert via mammoth
+                        let pdfDocxBlob = null;
+                        for (const delims of [{ start: '{', end: '}' }, { start: '{{', end: '}}' }]) {
+                            try {
+                                const zipPdf = new PizZip(currentTemplate.content);
+                                const docPdf = new window.docxtemplater(zipPdf, {
+                                    paragraphLoop: true, linebreaks: true,
+                                    delimiters: delims, nullGetter: () => '', errorLogging: false,
+                                });
+                                docPdf.render(templateData);
+                                pdfDocxBlob = docPdf.getZip().generate({ type: 'blob',
+                                    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                                break;
+                            } catch(e) { /* try next delimiter */ }
+                        }
+                        if (!pdfDocxBlob) { showToast('Lỗi tạo PDF', true); return null; }
+
+                        const arrayBuffer = await pdfDocxBlob.arrayBuffer();
+                        const result = await mammoth.convertToHtml({ arrayBuffer });
                         
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = result.value;
