@@ -484,7 +484,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-800 text-white px-4 py-3 rounded shadow-lg flex items-center gap-3 z-50">
         <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-        <span id="toast-message" class="text-sm font-medium"></span>
+        <span id="toast-message" class="text-sm font-medium whitespace-pre-line"></span>
     </div>
 
     <!-- Confirm Modal -->
@@ -998,6 +998,29 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             BBNT: 'Bien_Ban_Nghiem_Thu',
             DNTT: 'De_Nghi_Thanh_Toan',
         };
+
+        function getDocxtemplaterErrorMessage(error) {
+            if (error.properties && error.properties.errors instanceof Array) {
+                const errorMessages = error.properties.errors.map(function (err) {
+                    let part = err.properties.explanation || err.message || "Lỗi không xác định";
+                    if (err.properties.offset !== undefined) {
+                        part += " (vị trí: " + err.properties.offset + ")";
+                    }
+                    if (err.properties.xtag) {
+                        part += " [Thẻ: " + err.properties.xtag + "]";
+                    }
+                    return "- " + part;
+                }).join("\n");
+                return "Biểu mẫu của bạn có lỗi cú pháp (ví dụ: thiếu dấu ngoặc đóng '}' cho một biến).\nChi tiết:\n" + errorMessages;
+            }
+            if (error.properties && error.properties.explanation) {
+                return "Lỗi biểu mẫu: " + error.properties.explanation;
+            }
+            if (error.message === "Multi error") {
+                return "Biểu mẫu của bạn có nhiều lỗi cú pháp. Vui lòng kiểm tra lại các biến (đảm bảo có đủ dấu ngoặc {}).";
+            }
+            return error.message || "Lỗi biểu mẫu không xác định";
+        }
 
 
 
@@ -1901,18 +1924,36 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         }
                     }
                 } else {
-                    const PizZip = window.PizZip || PizZip;
-                    const data = template.content instanceof ArrayBuffer ? new Uint8Array(template.content) : template.content;
-                    const zip = new PizZip(data);
-                    const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+                    const PizZipLib = window.PizZip;
+                    const DocxtemplaterLib = window.docxtemplater || window.Docxtemplater;
                     
-                    // Lấy text thô từ XML để tìm biến chính xác hơn (tránh Word chia tag giữa { và })
+                    if (!PizZipLib || !DocxtemplaterLib) {
+                        throw new Error("Thư viện xử lý Word (PizZip/docxtemplater) chưa được tải.");
+                    }
+
+                    const data = template.content instanceof ArrayBuffer ? new Uint8Array(template.content) : template.content;
+                    
+                    if (data instanceof Uint8Array && data.length >= 4) {
+                        if (data[0] !== 0x50 || data[1] !== 0x4B || data[2] !== 0x03 || data[3] !== 0x04) {
+                            throw new Error("NOT_A_ZIP_FILE");
+                        }
+                    }
+
+                    const zip = new PizZipLib(data);
+                    const doc = new DocxtemplaterLib(zip, { paragraphLoop: true, linebreaks: true });
+                    
+                    // Lấy text thô từ TẤT CẢ các file XML trong word/ để tìm biến chính xác hơn (bao gồm header, footer, bảng)
                     let cleanText = "";
                     try {
-                        const xmlContent = zip.files["word/document.xml"].asText();
-                        // Loại bỏ các tag XML nhưng giữ lại nội dung để tìm biến
-                        cleanText = xmlContent.replace(/<[^>]+>/g, '');
+                        Object.keys(zip.files).forEach(fileName => {
+                            if (fileName.startsWith("word/") && fileName.endsWith(".xml")) {
+                                const xmlContent = zip.files[fileName].asText();
+                                // Loại bỏ các tag XML nhưng giữ lại nội dung để tìm biến
+                                cleanText += xmlContent.replace(/<[^>]+>/g, '') + " ";
+                            }
+                        });
                     } catch(e) {
+                        console.warn("Lỗi khi quét XML thô, sử dụng fallback getFullText", e);
                         cleanText = doc.getFullText();
                     }
                     
@@ -1944,6 +1985,17 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     }
                 }
                 
+                // Loại TABLE_ keys khỏi vars (chúng sẽ được render thành bảng, không phải input)
+                for (const key of Array.from(vars)) {
+                    if (key.startsWith('TABLE_')) vars.delete(key);
+                }
+
+                // Nếu TABLE_HANG_HOA xuất hiện trong vars nhưng chưa có trong tables
+                // → tự tạo bảng với cột mặc định
+                if (!tables['TABLE_HANG_HOA'] && !tables['HANG_HOA']) {
+                    tables['TABLE_HANG_HOA'] = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU'];
+                }
+                
                 templateVariables = Array.from(vars);
                 templateTables = tables;
                 buildDynamicForm();
@@ -1951,10 +2003,14 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             } catch (error) {
                 console.error("Error parsing template:", error);
                 let msg = "Lỗi khi đọc biểu mẫu.";
-                if (error.message && error.message.includes("not a zip")) {
-                    msg = "File không đúng định dạng (không phải file Word/Excel hợp lệ).";
+                if (error.message === "NOT_A_ZIP_FILE" || (error.message && error.message.includes("not a zip"))) {
+                    msg = "File không phải là định dạng .docx chuẩn (có thể là file .doc cũ bị đổi đuôi). Vui lòng mở file bằng Word và chọn Save As -> Word Document (*.docx).";
                 } else if (error.message && error.message.includes("corrupted")) {
                     msg = "File biểu mẫu bị hỏng hoặc không thể đọc được.";
+                } else if (error.message === "Multi error" || (error.properties && error.properties.errors)) {
+                    msg = getDocxtemplaterErrorMessage(error);
+                } else {
+                    msg = error.message || msg;
                 }
                 showToast(msg, true);
                 
@@ -1963,7 +2019,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 formContainer.innerHTML = `
                     <div class="col-span-full flex flex-col items-center justify-center text-red-400 py-10">
                         <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                        <p class="text-sm font-bold">${msg}</p>
+                        <p class="text-sm font-bold whitespace-pre-line">${msg}</p>
                         <p class="text-xs mt-1 text-gray-500">Vui lòng kiểm tra lại file của bạn.</p>
                     </div>
                 `;
@@ -1974,12 +2030,18 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const formContainer = document.getElementById('dynamic-form');
             formContainer.innerHTML = '';
 
+            const schemaFields = (currentTemplate && currentTemplate.schema && currentTemplate.schema.fields) ? currentTemplate.schema.fields : {};
+
+            // Với template docx, luôn đảm bảo có bảng hàng hóa
+            if (currentTemplate && currentTemplate.type === 'docx'
+                && !templateTables['TABLE_HANG_HOA'] && !templateTables['HANG_HOA']) {
+                templateTables['TABLE_HANG_HOA'] = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU'];
+            }
+
             if (templateVariables.length === 0 && Object.keys(templateTables).length === 0) {
                 formContainer.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500 text-sm">Không tìm thấy trường dữ liệu nào (định dạng {ten_truong}).</div>';
                 return;
             }
-
-            const schemaFields = (currentTemplate && currentTemplate.schema && currentTemplate.schema.fields) ? currentTemplate.schema.fields : {};
 
             // Render normal variables
             templateVariables.forEach(v => {
@@ -2006,7 +2068,30 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 } else if (type === 'checkbox') {
                     inputHtml = `<div class="flex items-center h-full"><input type="checkbox" data-var="${v}" class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"></div>`;
                 } else if (type === 'select') {
-                    inputHtml = `<input type="text" data-var="${v}" class="w-full text-sm border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm" placeholder="Nhập ${label} (Dropdown)">`;
+                    let opts = '';
+                    if (v === 'SELECT_VAT') {
+                        opts = `<option value="">-- Chọn VAT --</option>
+                                <option value="0">0%</option>
+                                <option value="8">8%</option>
+                                <option value="10">10%</option>`;
+                    } else if (v === 'SELECT_CHIET_KHAU') {
+                        opts = `<option value="0">Không chiết khấu (0%)</option>
+                                <option value="5">5%</option>
+                                <option value="10">10%</option>
+                                <option value="15">15%</option>
+                                <option value="20">20%</option>`;
+                    } else if (v === 'SELECT_HINH_THUC_TT') {
+                        opts = `<option value="">-- Chọn hình thức --</option>
+                                <option value="Chuyển khoản ngân hàng">Chuyển khoản ngân hàng</option>
+                                <option value="Tiền mặt">Tiền mặt</option>
+                                <option value="30% đặt cọc, 70% khi giao hàng">30% đặt cọc, 70% khi giao hàng</option>
+                                <option value="Thanh toán sau 30 ngày">Thanh toán sau 30 ngày</option>`;
+                    } else {
+                        const fieldOpts = fieldConfig.options || [];
+                        opts = '<option value="">-- Chọn --</option>' +
+                               fieldOpts.map(o => `<option value="${o}">${o}</option>`).join('');
+                    }
+                    inputHtml = `<select data-var="${v}" class="w-full text-sm border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm bg-white">${opts}</select>`;
                 } else {
                     inputHtml = `<input type="text" data-var="${v}" class="w-full text-sm border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-sm" placeholder="Nhập ${label}">`;
                 }
@@ -2019,29 +2104,38 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             });
 
             // Render tables
-            for (const [tableName, cols] of Object.entries(templateTables)) {
+            const COL_LABELS = {
+                STT:'STT', TEN_HANG:'Tên hàng hóa / Dịch vụ',
+                DVT:'ĐVT', NUM_SL:'Số lượng',
+                NUM_DON_GIA:'Đơn giá (VNĐ)', NUM_THANH_TIEN:'Thành tiền (VNĐ)',
+                GHI_CHU:'Ghi chú'
+            };
+
+            for (let [tableName, cols] of Object.entries(templateTables)) {
+                if (!cols || cols.length === 0) {
+                    cols = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU'];
+                }
                 const tableDiv = document.createElement('div');
-                tableDiv.className = "col-span-full mt-4 border border-gray-200 rounded-lg overflow-hidden bg-white";
-                
-                let ths = cols.map(c => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${c}</th>`).join('');
-                
+                tableDiv.className = "col-span-full mt-4";
+
+                const ths = cols.map(c => {
+                    const lbl = COL_LABELS[c] || c;
+                    return `<th class="px-3 py-2.5 text-left text-xs font-semibold text-white bg-blue-700">${lbl}</th>`;
+                }).join('');
+
                 tableDiv.innerHTML = `
-                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                        <h3 class="text-sm font-semibold text-gray-700">${tableName}</h3>
-                        <button type="button" class="add-row-btn text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200" data-table="${tableName}">+ Thêm dòng</button>
+                    <div class="bg-blue-600 px-4 py-2.5 rounded-t-lg flex justify-between items-center">
+                        <span class="text-sm font-semibold text-white">Bảng hàng hóa / dịch vụ</span>
+                        <button type="button" class="add-row-btn bg-white text-blue-700 text-xs px-3 py-1 rounded-md hover:bg-blue-50 font-semibold" data-table="${tableName}">+ Thêm dòng</button>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200" id="table-${tableName}">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    ${ths}
-                                    <th class="px-4 py-2 w-10"></th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200" id="tbody-${tableName}">
-                                <!-- Rows will be added here -->
-                            </tbody>
-                        </table>
+                    <div class="border border-gray-200 rounded-b-lg overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full" id="table-${tableName}">
+                                <thead><tr>${ths}<th class="w-8 bg-blue-700"></th></tr></thead>
+                                <tbody class="divide-y divide-gray-100 bg-white" id="tbody-${tableName}"></tbody>
+                            </table>
+                        </div>
+                        <div id="totals-${tableName}" class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-right space-y-1"></div>
                     </div>
                 `;
                 formContainer.appendChild(tableDiv);
@@ -2075,6 +2169,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     } else {
                         formData[e.target.dataset.var] = e.target.value;
                     }
+                    // Tự cập nhật tổng tiền khi thay đổi VAT hoặc chiết khấu
+                    const varName = e.target.dataset.var;
+                    if (varName === 'SELECT_VAT' || varName === 'SELECT_CHIET_KHAU') {
+                        updateTotals();
+                    }
                 });
             });
 
@@ -2088,9 +2187,27 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const tbody = document.getElementById(`tbody-${tableName}`);
             const tr = document.createElement('tr');
             
+            const rowIndex = tbody.querySelectorAll('tr').length + 1;
             let tds = cols.map(c => {
                 const val = rowData[c] !== undefined ? rowData[c] : '';
-                return `<td class="px-4 py-2 whitespace-nowrap"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 border p-1"></td>`;
+                if (c === 'STT') {
+                    return `<td class="px-3 py-2 text-center text-sm text-gray-500 w-10" data-stt="${rowIndex}">${rowIndex}</td>`;
+                }
+                if (c === 'NUM_THANH_TIEN') {
+                    return `<td class="px-2 py-2"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" readonly class="w-full text-sm border-gray-200 bg-blue-50 rounded p-1 text-right font-semibold text-blue-700 cursor-default" placeholder="Tự tính"></td>`;
+                }
+                if (c.startsWith('NUM_')) {
+                    return `<td class="px-2 py-2"><input type="number" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm border-gray-300 rounded p-1 text-right focus:ring-1 focus:ring-blue-400 border" placeholder="0" min="0"></td>`;
+                }
+                
+                // Cần lấy COL_LABELS từ scope bên ngoài hoặc định nghĩa lại nếu cần
+                const COL_LABELS = {
+                    STT:'STT', TEN_HANG:'Tên hàng hóa / Dịch vụ',
+                    DVT:'ĐVT', NUM_SL:'Số lượng',
+                    NUM_DON_GIA:'Đơn giá (VNĐ)', NUM_THANH_TIEN:'Thành tiền (VNĐ)',
+                    GHI_CHU:'Ghi chú'
+                };
+                return `<td class="px-2 py-2"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm border-gray-300 rounded p-1 focus:ring-1 focus:ring-blue-400 border" placeholder="${COL_LABELS[c] || c}"></td>`;
             }).join('');
             
             tr.innerHTML = `
@@ -2102,11 +2219,31 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             
             tr.querySelector('.remove-row-btn').addEventListener('click', () => {
                 tr.remove();
+                // Cập nhật lại STT
+                tbody.querySelectorAll('tr').forEach((r, i) => {
+                    const sttEl = r.querySelector('[data-stt]');
+                    if (sttEl) { sttEl.textContent = i + 1; sttEl.dataset.stt = i + 1; }
+                });
                 updateTableData(tableName, cols);
+                if (typeof updateTotals === 'function') updateTotals();
             });
             
             tr.querySelectorAll('input').forEach(input => {
-                input.addEventListener('input', () => updateTableData(tableName, cols));
+                input.addEventListener('input', () => {
+                    // Tự tính THANH_TIEN = SL × DON_GIA
+                    if (input.dataset.col === 'NUM_SL' || input.dataset.col === 'NUM_DON_GIA') {
+                        const row = input.closest('tr');
+                        const slEl = row.querySelector('[data-col="NUM_SL"]');
+                        const dgEl = row.querySelector('[data-col="NUM_DON_GIA"]');
+                        const ttEl = row.querySelector('[data-col="NUM_THANH_TIEN"]');
+                        if (slEl && dgEl && ttEl) {
+                            const tt = (parseFloat(slEl.value) || 0) * (parseFloat(dgEl.value) || 0);
+                            ttEl.value = tt.toLocaleString('vi-VN');
+                        }
+                    }
+                    updateTableData(tableName, cols);
+                    if (typeof updateTotals === 'function') updateTotals();
+                });
             });
             
             tbody.appendChild(tr);
@@ -2115,14 +2252,19 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         function updateTableData(tableName, cols) {
             const tbody = document.getElementById(`tbody-${tableName}`);
+            if (!tbody) return;
             const rows = tbody.querySelectorAll('tr');
             const tableData = [];
             
-            rows.forEach(row => {
+            rows.forEach((row, idx) => {
                 const rowObj = {};
                 cols.forEach(c => {
-                    const input = row.querySelector(`input[data-col="${c}"]`);
-                    rowObj[c] = input ? input.value : '';
+                    if (c === 'STT') {
+                        rowObj[c] = String(idx + 1);
+                    } else {
+                        const input = row.querySelector(`[data-col="${c}"]`);
+                        rowObj[c] = input ? input.value : '';
+                    }
                 });
                 tableData.push(rowObj);
             });
@@ -2448,10 +2590,23 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     
                     return { type: 'pdf', blob: pdfBlob, extension: 'pdf', mimeType: 'application/pdf', fileName: fileName, docTypeCode: docTypeCode };
                 } else {
-                    const PizZip = window.PizZip || PizZip;
+                    const PizZipLib = window.PizZip;
+                    const DocxtemplaterLib = window.docxtemplater || window.Docxtemplater;
+                    
+                    if (!PizZipLib || !DocxtemplaterLib) {
+                        throw new Error("Thư viện xử lý Word (PizZip/docxtemplater) chưa được tải.");
+                    }
+
                     const data = currentTemplate.content instanceof ArrayBuffer ? new Uint8Array(currentTemplate.content) : currentTemplate.content;
-                    const zip = new PizZip(data);
-                    const doc = new window.docxtemplater(zip, {
+                    
+                    if (data instanceof Uint8Array && data.length >= 4) {
+                        if (data[0] !== 0x50 || data[1] !== 0x4B || data[2] !== 0x03 || data[3] !== 0x04) {
+                            throw new Error("NOT_A_ZIP_FILE");
+                        }
+                    }
+
+                    const zip = new PizZipLib(data);
+                    const doc = new DocxtemplaterLib(zip, {
                         paragraphLoop: true,
                         linebreaks: true,
                     });
@@ -2469,7 +2624,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     } else if (type === 'pdf') {
                         // Client-side PDF generation via mammoth + html2pdf
                         const arrayBuffer = await out.arrayBuffer();
-                        const result = await mammoth.convertToHtml({arrayBuffer: arrayBuffer});
+                        const Mammoth = window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
+                        if (!Mammoth) throw new Error("Thư viện mammoth chưa được tải.");
+                        const result = await Mammoth.convertToHtml({arrayBuffer: arrayBuffer});
                         
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = result.value;
@@ -2502,12 +2659,16 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             } catch (error) {
                 console.error("Error generating document:", error);
                 let msg = "Lỗi khi tạo tài liệu.";
-                if (error.message && error.message.includes("not a zip")) {
-                    msg = "Biểu mẫu không hợp lệ (không phải file Word/Excel chuẩn).";
+                if (error.message === "NOT_A_ZIP_FILE" || (error.message && error.message.includes("not a zip"))) {
+                    msg = "File không phải là định dạng .docx chuẩn (có thể là file .doc cũ bị đổi đuôi). Vui lòng mở file bằng Word và chọn Save As -> Word Document (*.docx).";
                 } else if (error.message && error.message.includes("corrupted")) {
                     msg = "Biểu mẫu bị hỏng hoặc không thể đọc được.";
                 } else if (error.message && error.message.includes("Can't find endTag")) {
                     msg = "Lỗi cấu trúc bảng trong biểu mẫu (thiếu thẻ đóng {/TABLE_...}).";
+                } else if (error.message === "Multi error" || (error.properties && error.properties.errors)) {
+                    msg = getDocxtemplaterErrorMessage(error);
+                } else {
+                    msg = error.message || msg;
                 }
                 showToast(msg, true);
                 throw error;
@@ -3882,24 +4043,89 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         function computeFields(data) {
             const computed = { ...data };
-            
             const today = new Date();
-            computed['NGAY_THANG_NAM'] = formatDateLongVN(today);
-            
-            let sum = 0;
+
+            // Ngày tháng năm
+            computed['NGAY_THANG_NAM'] = today.toLocaleDateString('vi-VN', { day:'numeric', month:'long', year:'numeric' });
+            if (!computed['MA_TAI_LIEU']) {
+                computed['MA_TAI_LIEU'] = 'BG-' + today.getFullYear() + '-' + String(Date.now()).slice(-4);
+            }
+
+            // 1. Tổng tiền hàng = tổng SL × đơn giá từng dòng
+            let tongHang = 0;
             for (const key in data) {
                 if (key.startsWith('TABLE_') && Array.isArray(data[key])) {
-                    data[key].forEach(row => {
-                        const sl = parseFloat(row.NUM_SL || 0);
-                        const dg = parseFloat(row.NUM_DON_GIA || row.NUM_GIA || 0);
-                        sum += sl * dg;
+                    data[key].forEach((row, idx) => {
+                        const sl = parseFloat(String(row['NUM_SL'] || '0').replace(/\D/g,'')) || 0;
+                        const dg = parseFloat(String(row['NUM_DON_GIA'] || '0').replace(/\D/g,'')) || 0;
+                        const tt = sl * dg;
+                        row['NUM_THANH_TIEN'] = tt.toLocaleString('vi-VN');
+                        row['STT'] = String(idx + 1);
+                        tongHang += tt;
                     });
                 }
             }
-            computed['TONG_CONG'] = formatVND(sum);
-            computed['TIEN_BANG_CHU'] = numberToVietnameseWords(sum);
+            const fmtVND = n => n.toLocaleString('vi-VN');
+            computed['TONG_CONG'] = fmtVND(tongHang);
+
+            // 2. Chiết khấu
+            const ckPct = parseFloat(data['SELECT_CHIET_KHAU'] || 0);
+            const ckTien = tongHang * ckPct / 100;
+            computed['CHIET_KHAU_TIEN'] = fmtVND(ckTien);
+
+            // 3. VAT
+            const vatPct = parseFloat(data['SELECT_VAT'] || 0);
+            const afterCK = tongHang - ckTien;
+            const vatTien = afterCK * vatPct / 100;
+            computed['VAT_TIEN'] = fmtVND(vatTien);
+
+            // 4. Tổng thanh toán
+            const tongTT = afterCK + vatTien;
+            computed['TONG_THANH_TOAN'] = fmtVND(tongTT);
+
+            // 5. Tiền bằng chữ (gọi hàm đã có trong file)
+            if (typeof numberToVietnameseWords === 'function') {
+                computed['TIEN_BANG_CHU'] = numberToVietnameseWords(tongTT);
+            }
 
             return computed;
+        }
+
+        function updateTotals() {
+            const computed = computeFields(formData);
+
+            // Cập nhật các input tổng tiền trên form
+            ['TONG_CONG','CHIET_KHAU_TIEN','VAT_TIEN','TONG_THANH_TOAN','TIEN_BANG_CHU'].forEach(f => {
+                const el = document.querySelector(`[data-var="${f}"]`);
+                if (el) el.value = computed[f] || '';
+                formData[f] = computed[f] || '';
+            });
+
+            // Hiển thị tóm tắt dưới bảng hàng hóa
+            const totalsDiv = document.getElementById('totals-TABLE_HANG_HOA')
+                           || document.getElementById('totals-HANG_HOA');
+            if (totalsDiv) {
+                const ck = parseFloat(formData['SELECT_CHIET_KHAU'] || 0);
+                const vat = parseFloat(formData['SELECT_VAT'] || 0);
+                totalsDiv.innerHTML = `
+                    <div class="flex justify-end gap-8 text-sm py-0.5">
+                        <span class="text-gray-500">Tổng tiền hàng:</span>
+                        <span class="font-medium text-gray-800 w-36 text-right">${computed['TONG_CONG']} VNĐ</span>
+                    </div>
+                    ${ck > 0 ? `<div class="flex justify-end gap-8 text-sm py-0.5">
+                        <span class="text-gray-500">Chiết khấu (${ck}%):</span>
+                        <span class="font-medium text-red-600 w-36 text-right">− ${computed['CHIET_KHAU_TIEN']} VNĐ</span>
+                    </div>` : ''}
+                    ${vat > 0 ? `<div class="flex justify-end gap-8 text-sm py-0.5">
+                        <span class="text-gray-500">Thuế VAT (${vat}%):</span>
+                        <span class="font-medium text-gray-600 w-36 text-right">+ ${computed['VAT_TIEN']} VNĐ</span>
+                    </div>` : ''}
+                    <div class="flex justify-end gap-8 text-sm font-bold pt-1.5 border-t border-gray-300 mt-1">
+                        <span class="text-gray-800">TỔNG THANH TOÁN:</span>
+                        <span class="text-blue-700 text-base w-36 text-right">${computed['TONG_THANH_TOAN']} VNĐ</span>
+                    </div>
+                `;
+            }
         }
 
         // --- SETTINGS LOGIC ---
@@ -4165,10 +4391,23 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         }
                     }
                 } else {
-                    const PizZip = window.PizZip || PizZip;
+                    const PizZipLib = window.PizZip;
+                    const DocxtemplaterLib = window.docxtemplater || window.Docxtemplater;
+                    
+                    if (!PizZipLib || !DocxtemplaterLib) {
+                        throw new Error("Thư viện xử lý Word (PizZip/docxtemplater) chưa được tải.");
+                    }
+
                     const data = template.content instanceof ArrayBuffer ? new Uint8Array(template.content) : template.content;
-                    const zip = new PizZip(data);
-                    const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+                    
+                    if (data instanceof Uint8Array && data.length >= 4) {
+                        if (data[0] !== 0x50 || data[1] !== 0x4B || data[2] !== 0x03 || data[3] !== 0x04) {
+                            throw new Error("NOT_A_ZIP_FILE");
+                        }
+                    }
+
+                    const zip = new PizZipLib(data);
+                    const doc = new DocxtemplaterLib(zip, { paragraphLoop: true, linebreaks: true });
                     let cleanText = "";
                     try {
                         Object.keys(zip.files).forEach(fileName => {
@@ -4233,10 +4472,12 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     msg = "File không đúng định dạng (không phải file Word/Excel hợp lệ).";
                 } else if (err.message && err.message.includes("corrupted")) {
                     msg = "File biểu mẫu bị hỏng hoặc không thể đọc được.";
+                } else if (err.properties && err.properties.errors) {
+                    msg = getDocxtemplaterErrorMessage(err);
                 }
                 list.innerHTML = `<div class="flex flex-col items-center justify-center text-red-500 py-6">
                     <svg class="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                    <p class="font-bold">${msg}</p>
+                    <p class="font-bold whitespace-pre-line">${msg}</p>
                 </div>`;
                 container.classList.remove('hidden');
             }
