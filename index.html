@@ -9,14 +9,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     
-    <!-- Google APIs -->
-    <script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
-    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-    
     <!-- Document Processing Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.4/dist/pizzip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip-utils.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.11/docxtemplater.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip-utils.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -507,6 +503,27 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         </div>
     </div>
 
+    <!-- Next Actions Modal -->
+    <div id="next-actions-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all animate-in fade-in zoom-in duration-300">
+            <div class="p-6 text-center">
+                <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Đã lưu tài liệu thành công!</h3>
+                <p class="text-gray-500 mb-6">Bạn có muốn tiếp tục tạo các tài liệu liên quan từ dữ liệu này không?</p>
+                
+                <div id="next-actions-list" class="flex flex-col gap-3">
+                    <!-- Buttons will be injected here -->
+                </div>
+                
+                <button onclick="closeNextActionsModal()" class="mt-6 text-sm text-gray-500 hover:text-gray-700 font-medium">
+                    Để sau
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div id="settings-modal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden" style="height: 85vh; max-height: 800px;">
@@ -963,6 +980,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         let generatedDocuments = [];
         let selectedCustomer = null;
         let selectedContact = null;
+        let pendingChainedData = null;
 
         let isDemoMode = false;
 
@@ -1617,34 +1635,51 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const file = event.target.files[0];
             if (!file) return;
 
+            // Validate file extension
+            const fileName = file.name.toLowerCase();
+            if (!fileName.endsWith('.docx') && !fileName.endsWith('.xlsx')) {
+                showToast("Định dạng file không hỗ trợ. Vui lòng chọn file .docx hoặc .xlsx", true);
+                event.target.value = '';
+                return;
+            }
+
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const content = e.target.result;
-                const type = file.name.endsWith('.xlsx') ? 'xlsx' : 'docx';
-                const templateObj = { 
-                    id: 'local_' + Date.now(), 
-                    name: file.name, 
-                    content: content,
-                    type: type,
-                    source: 'local'
-                };
-                
-                // Check if already exists by name
-                const existingIdx = templates.findIndex(t => t.name === file.name && t.source === 'local');
-                if (existingIdx >= 0) {
-                    templates[existingIdx] = templateObj;
-                } else {
-                    templates.unshift(templateObj); // Add to top
-                }
-                
-                renderTemplateList();
-                selectTemplate(templateObj);
-                showToast(`Đã tải lên: ${file.name}`);
-                
-                // Reset input
+            reader.onerror = function() {
+                showToast("Lỗi khi đọc file. Vui lòng thử lại.", true);
                 event.target.value = '';
             };
-            reader.readAsBinaryString(file);
+            reader.onload = function(e) {
+                try {
+                    const content = e.target.result;
+                    const type = file.name.endsWith('.xlsx') ? 'xlsx' : 'docx';
+                    const templateObj = { 
+                        id: 'local_' + Date.now(), 
+                        name: file.name, 
+                        content: content,
+                        type: type,
+                        source: 'local'
+                    };
+                    
+                    // Check if already exists by name
+                    const existingIdx = templates.findIndex(t => t.name === file.name && t.source === 'local');
+                    if (existingIdx >= 0) {
+                        templates[existingIdx] = templateObj;
+                    } else {
+                        templates.unshift(templateObj); // Add to top
+                    }
+                    
+                    renderTemplateList();
+                    selectTemplate(templateObj);
+                    showToast(`Đã tải lên: ${file.name}`);
+                } catch (err) {
+                    console.error("Upload processing error:", err);
+                    showToast("Lỗi khi xử lý file tải lên.", true);
+                } finally {
+                    // Reset input
+                    event.target.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
 
         function renderTemplateList() {
@@ -1721,15 +1756,17 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             if (template.source === 'drive' && !template.content) {
                 try {
                     showToast("Đang tải nội dung từ Drive...");
-                    const response = await gapi.client.drive.files.get({
-                        fileId: template.id,
-                        alt: 'media'
-                    });
-                    // Drive API returns string for alt=media, need to convert to binary string for PizZip
-                    // This is tricky with gapi.client. Better to use fetch with token
+                    
                     const fetchRes = await fetch(`https://www.googleapis.com/drive/v3/files/${template.id}?alt=media`, {
                         headers: { Authorization: `Bearer ${accessToken}` }
                     });
+                    
+                    if (!fetchRes.ok) {
+                        const errorText = await fetchRes.text();
+                        console.error("Drive fetch error:", errorText);
+                        throw new Error(`Drive API error: ${fetchRes.status}`);
+                    }
+                    
                     const blob = await fetchRes.blob();
                     
                     const reader = new FileReader();
@@ -1742,12 +1779,28 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     return;
                 } catch (err) {
                     console.error("Error fetching file content", err);
-                    showToast("Lỗi khi tải file từ Drive", true);
+                    showToast("Lỗi khi tải file từ Drive: " + err.message, true);
                     return;
                 }
             }
 
             extractVariablesAndBuildForm(template);
+            
+            if (pendingChainedData) {
+                const data = { ...pendingChainedData };
+                pendingChainedData = null; // Clear immediately to avoid loops
+                
+                await new Promise(r => setTimeout(r, 400));
+                fillFormWithData(data);
+                
+                if (data.customerId) {
+                    selectCustomer(data.customerId);
+                } else if (data['TEN_KHACH_HANG']) {
+                    const matched = customers.find(c => c.ten_cong_ty === data['TEN_KHACH_HANG']);
+                    if (matched) selectCustomer(matched.id);
+                }
+                showToast('Đã áp dụng dữ liệu từ tài liệu gốc.');
+            }
         }
 
         function clearSelectedTemplate() {
@@ -1774,8 +1827,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const tables = {};
                 
                 if (template.type === 'xlsx') {
-                    const workbook = XLSX.read(template.content, { type: 'binary' });
-                    const regex = /\{([^{}]+)\}/g;
+                    const data = template.content instanceof ArrayBuffer ? new Uint8Array(template.content) : template.content;
+                    const workbook = XLSX.read(data, { type: data instanceof Uint8Array ? 'array' : 'binary' });
+                    const regex = /\{+([^{}]+?)\}+/g;
                     
                     workbook.SheetNames.forEach(sheetName => {
                         const sheet = workbook.Sheets[sheetName];
@@ -1821,7 +1875,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     });
                 } else if (template.type === 'html') {
                     const text = template.content;
-                    const regex = /\{([^{}]+)\}/g;
+                    const regex = /\{+([^{}]+?)\}+/g;
                     let match;
                     let currentTable = null;
 
@@ -1847,25 +1901,27 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         }
                     }
                 } else {
-                    const zip = new PizZip(template.content);
+                    const PizZip = window.PizZip || PizZip;
+                    const data = template.content instanceof ArrayBuffer ? new Uint8Array(template.content) : template.content;
+                    const zip = new PizZip(data);
                     const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
                     
                     // Lấy text thô từ XML để tìm biến chính xác hơn (tránh Word chia tag giữa { và })
-                    let text = "";
+                    let cleanText = "";
                     try {
                         const xmlContent = zip.files["word/document.xml"].asText();
                         // Loại bỏ các tag XML nhưng giữ lại nội dung để tìm biến
-                        text = xmlContent.replace(/<[^>]+>/g, '');
+                        cleanText = xmlContent.replace(/<[^>]+>/g, '');
                     } catch(e) {
-                        text = doc.getFullText();
+                        cleanText = doc.getFullText();
                     }
                     
                     // Regex to find {variables}
-                    const regex = /\{([^{}]+)\}/g;
+                    const regex = /\{+([^{}]+?)\}+/g;
                     let match;
                     let currentTable = null;
 
-                    while ((match = regex.exec(text)) !== null) {
+                    while ((match = regex.exec(cleanText)) !== null) {
                         let varName = match[1].trim();
                         if (varName.startsWith('#TABLE_')) {
                             currentTable = varName.substring(1);
@@ -1894,7 +1950,23 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
             } catch (error) {
                 console.error("Error parsing template:", error);
-                showToast("Lỗi khi đọc biểu mẫu. File không hợp lệ.", true);
+                let msg = "Lỗi khi đọc biểu mẫu.";
+                if (error.message && error.message.includes("not a zip")) {
+                    msg = "File không đúng định dạng (không phải file Word/Excel hợp lệ).";
+                } else if (error.message && error.message.includes("corrupted")) {
+                    msg = "File biểu mẫu bị hỏng hoặc không thể đọc được.";
+                }
+                showToast(msg, true);
+                
+                // Clear form to show error state
+                const formContainer = document.getElementById('dynamic-form');
+                formContainer.innerHTML = `
+                    <div class="col-span-full flex flex-col items-center justify-center text-red-400 py-10">
+                        <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <p class="text-sm font-bold">${msg}</p>
+                        <p class="text-xs mt-1 text-gray-500">Vui lòng kiểm tra lại file của bạn.</p>
+                    </div>
+                `;
             }
         }
 
@@ -2062,7 +2134,17 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const file = event.target.files[0];
             if (!file) return;
 
+            if (!file.name.toLowerCase().endsWith('.xlsx')) {
+                showToast("Vui lòng chọn file Excel (.xlsx)", true);
+                event.target.value = '';
+                return;
+            }
+
             const reader = new FileReader();
+            reader.onerror = function() {
+                showToast("Lỗi khi đọc file dữ liệu.", true);
+                event.target.value = '';
+            };
             reader.onload = function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
@@ -2077,30 +2159,42 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         formData = {...formData, ...rowData};
                         
                         // Update UI
-                        const inputs = document.getElementById('dynamic-form').querySelectorAll('input');
+                        const inputs = document.getElementById('dynamic-form').querySelectorAll('input, textarea, select');
                         let matchedCount = 0;
                         inputs.forEach(input => {
                             const varName = input.dataset.var;
-                            if (formData[varName] !== undefined) {
-                                input.value = formData[varName];
+                            if (varName && formData[varName] !== undefined) {
+                                if (input.type === 'checkbox') {
+                                    input.checked = !!formData[varName];
+                                } else {
+                                    input.value = formData[varName];
+                                }
                                 matchedCount++;
                             }
                         });
                         showToast(`Đã nạp dữ liệu từ Excel (${matchedCount} trường khớp)`);
                     } else {
-                        showToast("File Excel trống", true);
+                        showToast("File Excel trống hoặc không có dữ liệu hợp lệ", true);
                     }
                 } catch (err) {
-                    console.error(err);
-                    showToast("Lỗi khi đọc file Excel", true);
+                    console.error("Error parsing data file:", err);
+                    showToast("Lỗi khi xử lý file Excel. File có thể bị hỏng.", true);
+                } finally {
+                    event.target.value = '';
                 }
-                event.target.value = ''; // Reset
             };
             reader.readAsArrayBuffer(file);
         }
 
         async function generateDocument(type) {
-            if (!currentTemplate || !currentTemplate.content) return;
+            if (!currentTemplate) {
+                showToast("Vui lòng chọn một biểu mẫu trước.", true);
+                return;
+            }
+            if (!currentTemplate.content) {
+                showToast("Nội dung biểu mẫu chưa được tải. Vui lòng thử lại.", true);
+                return;
+            }
 
             const btn = type ? document.getElementById(`generate-${type}-btn`) : null;
             let originalText = '';
@@ -2152,7 +2246,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const fileName = buildFileName(formData, selectedCustomer, _dlDocType, _dlExt);
 
                 if (currentTemplate.type === 'xlsx') {
-                    const workbook = XLSX.read(currentTemplate.content, { type: 'binary' });
+                    const data = currentTemplate.content instanceof ArrayBuffer ? new Uint8Array(currentTemplate.content) : currentTemplate.content;
+                    const workbook = XLSX.read(data, { type: data instanceof Uint8Array ? 'array' : 'binary' });
                     
                     workbook.SheetNames.forEach(sheetName => {
                         const sheet = workbook.Sheets[sheetName];
@@ -2243,15 +2338,15 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                                                         sheet[newCell] = JSON.parse(JSON.stringify(templateCell));
                                                         
                                                         if (typeof sheet[newCell].v === 'string') {
-                                                            let text = sheet[newCell].v;
-                                                            text = text.replace(startTag, '').replace(endTag, '');
+                                                            let cleanText = sheet[newCell].v;
+                                                            cleanText = cleanText.replace(startTag, '').replace(endTag, '');
                                                             
                                                             for (const [k, v] of Object.entries(rowData)) {
                                                                 if (typeof v === 'string' || typeof v === 'number') {
-                                                                    text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v || '');
+                                                                    cleanText = cleanText.replace(new RegExp(`\\{${k}\\}`, 'g'), v || '');
                                                                 }
                                                             }
-                                                            sheet[newCell].v = text;
+                                                            sheet[newCell].v = cleanText;
                                                         }
                                                     }
                                                 }
@@ -2267,13 +2362,13 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         for (let cell in sheet) {
                             if (cell[0] === '!') continue;
                             if (typeof sheet[cell].v === 'string') {
-                                let text = sheet[cell].v;
+                                let cleanText = sheet[cell].v;
                                 for (const [key, value] of Object.entries(finalData)) {
                                     if (typeof value === 'string' || typeof value === 'number') {
-                                        text = text.replace(new RegExp(`\\{${key}\\}`, 'g'), value || '');
+                                        cleanText = cleanText.replace(new RegExp(`\\{${key}\\}`, 'g'), value || '');
                                     }
                                 }
-                                sheet[cell].v = text;
+                                sheet[cell].v = cleanText;
                             }
                         }
                     });
@@ -2353,7 +2448,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     
                     return { type: 'pdf', blob: pdfBlob, extension: 'pdf', mimeType: 'application/pdf', fileName: fileName, docTypeCode: docTypeCode };
                 } else {
-                    const zip = new PizZip(currentTemplate.content);
+                    const PizZip = window.PizZip || PizZip;
+                    const data = currentTemplate.content instanceof ArrayBuffer ? new Uint8Array(currentTemplate.content) : currentTemplate.content;
+                    const zip = new PizZip(data);
                     const doc = new window.docxtemplater(zip, {
                         paragraphLoop: true,
                         linebreaks: true,
@@ -2404,7 +2501,15 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 }
             } catch (error) {
                 console.error("Error generating document:", error);
-                showToast("Lỗi khi tạo tài liệu", true);
+                let msg = "Lỗi khi tạo tài liệu.";
+                if (error.message && error.message.includes("not a zip")) {
+                    msg = "Biểu mẫu không hợp lệ (không phải file Word/Excel chuẩn).";
+                } else if (error.message && error.message.includes("corrupted")) {
+                    msg = "Biểu mẫu bị hỏng hoặc không thể đọc được.";
+                } else if (error.message && error.message.includes("Can't find endTag")) {
+                    msg = "Lỗi cấu trúc bảng trong biểu mẫu (thiếu thẻ đóng {/TABLE_...}).";
+                }
+                showToast(msg, true);
                 throw error;
             } finally {
                 if (btn) {
@@ -3197,22 +3302,30 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
                 const _srcType = detectDocTypeFromName(doc.name);
                 const _chainOpts = CHAIN_OPTIONS[_srcType] || [];
-                const _chainHtml = _chainOpts.length === 0 ? '' : `
+                const _chainHtml = `
                     <div class="relative inline-block text-left" id="cm-${doc.id}">
                         <button onclick="toggleChainMenu('${doc.id}')"
-                                class="text-green-700 bg-green-50 hover:bg-green-100 text-xs font-medium px-2 py-1 rounded inline-flex items-center gap-1 border border-green-200">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                class="text-green-700 bg-green-50 hover:bg-green-100 text-xs font-medium px-2 py-1 rounded inline-flex items-center gap-1 border border-green-200 transition-all active:scale-95">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                             </svg>
                             Tạo tiếp
                         </button>
                         <div id="cd-${doc.id}"
-                             class="hidden absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-max py-1">
+                             class="hidden absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 min-w-[200px] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div class="px-3 py-1 mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tài liệu liên quan</div>
                             ${_chainOpts.map(opt => `
                                 <button onclick="createChainedDoc('${doc.id}','${doc.name}','${opt.type}')"
-                                        class="w-full text-left px-4 py-2 text-sm ${opt.colorClass} flex items-center gap-2">
+                                        class="w-full text-left px-4 py-2 text-sm ${opt.colorClass} flex items-center gap-2 transition-colors">
+                                    <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                                     ${opt.label}
                                 </button>`).join('')}
+                            ${_chainOpts.length > 0 ? '<div class="border-t border-gray-100 my-1"></div>' : ''}
+                            <button onclick="createChainedDoc('${doc.id}','${doc.name}', 'ANY')"
+                                    class="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2 transition-colors">
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V7M8 7h12m0 0v8a2 2 0 01-2 2h-6"></path></svg>
+                                Sử dụng cho mẫu khác...
+                            </button>
                         </div>
                     </div>`;
 
@@ -3286,6 +3399,45 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const dd = document.getElementById('cd-' + docId);
             if (dd) dd.classList.toggle('hidden');
         };
+
+        window.showNextActions = function(fileId, fileName, docType) {
+            const list = document.getElementById('next-actions-list');
+            list.innerHTML = '';
+            
+            const options = CHAIN_OPTIONS[docType] || [];
+            if (options.length === 0) return; // No next actions defined
+            
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = `w-full py-3 px-4 rounded-xl border border-gray-200 flex items-center justify-between hover:bg-gray-50 transition-all group`;
+                btn.onclick = () => {
+                    closeNextActionsModal();
+                    createChainedDoc(fileId, fileName, opt.type);
+                };
+                
+                btn.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-white transition-colors">
+                            <svg class="w-5 h-5 ${opt.colorClass.split(' ')[0]}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-bold text-gray-900">${opt.label}</p>
+                            <p class="text-xs text-gray-500">Sử dụng dữ liệu từ tài liệu vừa tạo</p>
+                        </div>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                `;
+                list.appendChild(btn);
+            });
+            
+            document.getElementById('next-actions-modal').classList.remove('hidden');
+        };
+
+        window.closeNextActionsModal = function() {
+            document.getElementById('next-actions-modal').classList.add('hidden');
+        };
         
         document.addEventListener('click', function(e) {
             if (!e.target.closest('[id^="cm-"]')) {
@@ -3352,7 +3504,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         window.createChainedDoc = async function(sourceFileId, sourceFileName, targetType) {
             document.querySelectorAll('[id^="cd-"]').forEach(el => el.classList.add('hidden'));
-            showToast('Đang chuẩn bị ' + (TYPE_LABELS[targetType] || targetType) + '...');
+            
+            if (targetType !== 'ANY') {
+                showToast('Đang chuẩn bị ' + (TYPE_LABELS[targetType] || targetType) + '...');
+            }
 
             try {
                 // Lấy formData đã cache
@@ -3376,6 +3531,20 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         if (ap.customerName && !sourceData['TEN_KHACH_HANG'])
                             sourceData['TEN_KHACH_HANG'] = ap.customerName;
                     } catch(e) { console.warn(e); }
+                }
+
+                if (targetType === 'ANY') {
+                    pendingChainedData = buildChainedFormData(sourceData, 'ANY');
+                    switchView('editor-view');
+                    showToast('Vui lòng chọn một biểu mẫu để áp dụng dữ liệu.', false, 5000);
+                    // Highlight template list
+                    const tList = document.getElementById('template-list');
+                    tList.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    tList.classList.add('ring-4', 'ring-blue-400', 'ring-opacity-50', 'rounded-lg');
+                    setTimeout(() => {
+                        tList.classList.remove('ring-4', 'ring-blue-400', 'ring-opacity-50');
+                    }, 4000);
+                    return;
                 }
 
                 // Tìm template phù hợp
@@ -3529,6 +3698,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 }
                 showToast("Đã lưu tài liệu lên Google Drive thành công!");
                 
+                // Show next actions modal
+                showNextActions(data.id, fileName, result.docTypeCode);
+
                 // Refresh list if we are on the documents view
                 const currentView = Array.from(document.querySelectorAll('.main-view')).find(v => !v.classList.contains('hidden'))?.id;
                 if (currentView === 'documents-view') {
@@ -3920,8 +4092,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const vars = new Set();
                 
                 if (template.type === 'xlsx') {
-                    const workbook = XLSX.read(template.content, { type: 'binary' });
-                    const regex = /\{([^{}]+)\}/g;
+                    const data = template.content instanceof ArrayBuffer ? new Uint8Array(template.content) : template.content;
+                    const workbook = XLSX.read(data, { type: data instanceof Uint8Array ? 'array' : 'binary' });
+                    const regex = /\{+([^{}]+?)\}+/g;
                     
                     workbook.SheetNames.forEach(sheetName => {
                         const sheet = workbook.Sheets[sheetName];
@@ -3966,7 +4139,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     });
                 } else if (template.type === 'html') {
                     const text = template.content;
-                    const regex = /\{([^{}]+)\}/g;
+                    const regex = /\{+([^{}]+?)\}+/g;
                     let match;
                     let currentTable = null;
 
@@ -3992,12 +4165,24 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         }
                     }
                 } else {
-                    const zip = new PizZip(template.content);
+                    const PizZip = window.PizZip || PizZip;
+                    const data = template.content instanceof ArrayBuffer ? new Uint8Array(template.content) : template.content;
+                    const zip = new PizZip(data);
                     const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-                    const text = doc.getFullText();
-                    const regex = /\{([^{}]+)\}/g;
+                    let cleanText = "";
+                    try {
+                        Object.keys(zip.files).forEach(fileName => {
+                            if (fileName.startsWith("word/") && fileName.endsWith(".xml")) {
+                                const xmlContent = zip.files[fileName].asText();
+                                cleanText += xmlContent.replace(/<[^>]+>/g, '') + " ";
+                            }
+                        });
+                    } catch(e) {
+                        cleanText = doc.getFullText();
+                    }
+                    const regex = /\{+([^{}]+?)\}+/g;
                     let match;
-                    while ((match = regex.exec(text)) !== null) {
+                    while ((match = regex.exec(cleanText)) !== null) {
                         let varName = match[1].trim();
                         if(varName.startsWith('#') || varName.startsWith('/') || varName.startsWith('^')) continue;
                         vars.add(varName);
@@ -4042,8 +4227,17 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 }
                 container.classList.remove('hidden');
             } catch (err) {
-                console.error(err);
-                list.innerHTML = '<p class="text-sm text-red-500 py-4">Lỗi khi đọc biểu mẫu.</p>';
+                console.error("Error parsing template for schema:", err);
+                let msg = "Lỗi khi đọc biểu mẫu.";
+                if (err.message && err.message.includes("not a zip")) {
+                    msg = "File không đúng định dạng (không phải file Word/Excel hợp lệ).";
+                } else if (err.message && err.message.includes("corrupted")) {
+                    msg = "File biểu mẫu bị hỏng hoặc không thể đọc được.";
+                }
+                list.innerHTML = `<div class="flex flex-col items-center justify-center text-red-500 py-6">
+                    <svg class="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    <p class="font-bold">${msg}</p>
+                </div>`;
                 container.classList.remove('hidden');
             }
         });
@@ -4111,5 +4305,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             }, 1000);
         };
     </script>
+    <!-- Google APIs -->
+    <script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
+    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
 </body>
 </html>
