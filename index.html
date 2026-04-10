@@ -2931,36 +2931,64 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         saveAs(out, fileName.replace(/\.(docx|xlsx)$/, '.docx'));
                         showToast("Đã tải xuống file DOCX");
                     } else if (type === 'pdf') {
-                        // Client-side PDF generation via mammoth + html2pdf
                         const arrayBuffer = await out.arrayBuffer();
                         const Mammoth = window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
                         if (!Mammoth) throw new Error("Thư viện mammoth chưa được tải.");
-                        const result = await Mammoth.convertToHtml({arrayBuffer: arrayBuffer});
-                        
+                        const mammothResult = await Mammoth.convertToHtml({ arrayBuffer });
+
                         const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = result.value;
-                        tempDiv.style.padding = '20mm';
-                        tempDiv.style.fontFamily = 'Times New Roman, serif';
-                        tempDiv.style.fontSize = '12pt';
-                        tempDiv.style.lineHeight = '1.5';
-                        tempDiv.style.width = '210mm'; // A4 width
-                        
-                        // Hide it but append to body so html2pdf can render it properly
-                        tempDiv.style.position = 'absolute';
-                        tempDiv.style.left = '-9999px';
+                        tempDiv.style.cssText = [
+                            'width:210mm',
+                            'padding:15mm 20mm',
+                            'font-family:Times New Roman,serif',
+                            'font-size:12pt',
+                            'line-height:1.6',
+                            'color:#000',
+                            'background:#fff',
+                            'box-sizing:border-box',
+                        ].join(';');
+                        tempDiv.innerHTML = mammothResult.value;
+                        // Gắn vào body theo luồng bình thường (không dùng absolute)
+                        // để html2canvas đo được chiều cao đúng
+                        tempDiv.style.position = 'fixed';
+                        tempDiv.style.top = '0';
+                        tempDiv.style.left = '0';
+                        tempDiv.style.zIndex = '-1';
+                        tempDiv.style.opacity = '0';
                         document.body.appendChild(tempDiv);
 
+                        // Đợi render xong
+                        await new Promise(r => setTimeout(r, 200));
+
                         const opt = {
-                            margin:       0,
-                            filename:     `${fileName}.pdf`,
-                            image:        { type: 'jpeg', quality: 0.98 },
-                            html2canvas:  { scale: 2, useCORS: true },
-                            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                            margin:      [10, 15, 10, 15],
+                            image:       { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
+                            jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
                         };
 
-                        await html2pdf().set(opt).from(tempDiv).save();
+                        // Lấy blob thay vì save thẳng
+                        const pdfBlob = await html2pdf()
+                            .set(opt)
+                            .from(tempDiv)
+                            .output('blob');
+
                         document.body.removeChild(tempDiv);
-                        showToast("Đã tải xuống file PDF");
+
+                        if (pdfBlob && pdfBlob.size > 1000) {
+                            const pdfFileName = fileName.replace(/\.(docx|xlsx)$/, '.pdf');
+                            saveAs(pdfBlob, pdfFileName);
+                            showToast('Đã tải xuống file PDF');
+                            // Gán resultObj cho save-to-Drive path
+                            resultObj = {
+                                type: 'pdf', blob: pdfBlob, extension: 'pdf',
+                                mimeType: 'application/pdf',
+                                fileName: pdfFileName, docTypeCode: docTypeCode
+                            };
+                            return resultObj;
+                        } else {
+                            showToast('Lỗi tạo PDF: file trống. Thử tải DOCX và chuyển đổi bên ngoài.', true);
+                        }
                     }
                     
                     resultObj = { type: 'docx', blob: out, extension: 'docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileName: fileName, docTypeCode: docTypeCode };
@@ -4188,14 +4216,13 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 if (!result) throw new Error("Generation failed");
                 
                 const template = currentTemplate;
-                // Xác định loại tài liệu
-                const _docType = detectDocTypeFromFormData(formData, currentTemplate?.name || '');
-
-                // Xác định extension từ template
-                const _ext = currentTemplate?.type === 'xlsx' ? 'xlsx' : 'docx';
-
-                // Build tên file theo quy tắc
-                const fileName = buildFileName(formData, selectedCustomer, _docType, _ext);
+                // Dùng fileName và docTypeCode từ result (đã được tính trong generateDocument)
+                // để đảm bảo nhất quán
+                const fileName = result.fileName || (() => {
+                    const _docType = detectDocTypeFromFormData(formData, currentTemplate?.name || '');
+                    const _ext = currentTemplate?.type === 'xlsx' ? 'xlsx' : 'docx';
+                    return buildFileName(formData, selectedCustomer, _docType, _ext);
+                })();
                 
                 const _fdKey = Date.now() + '_' + Math.random().toString(36).slice(2, 6);
                 localStorage.setItem('docflow_formdata_' + _fdKey, JSON.stringify({
@@ -4214,7 +4241,18 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     ...(selectedCustomer ? { customerName: selectedCustomer.ten_cong_ty } : {}),
                 };
                 
-                const folderId = driveDocFolderIds[result.docTypeCode] || driveRootFolderId;
+                // Xác định folder đích theo thứ tự ưu tiên:
+                // 1. Từ docTypeCode của result
+                // 2. Từ detectDocTypeFromFormData (dựa vào MA_TAI_LIEU)
+                // 3. Fallback DocFlow root
+                const _resultType = result.docTypeCode && result.docTypeCode !== 'TL'
+                    ? result.docTypeCode
+                    : detectDocTypeFromFormData(formData, currentTemplate?.name || '');
+                const folderId = (driveDocFolderIds && driveDocFolderIds[_resultType])
+                    || driveRootFolderId
+                    || null;
+
+                console.log('Saving to folder type:', _resultType, '| folderId:', folderId);
 
                 const data = await saveFileToDrive(result.blob, fileName, result.mimeType, appProps, null, folderId);
                 if (data?.id) {
