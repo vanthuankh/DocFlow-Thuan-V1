@@ -1456,27 +1456,24 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         // --- EVENT LISTENERS ---
         const handleAuthClick = async () => {
             if (!CLIENT_ID || !API_KEY) {
-                const clientIdInput = prompt("Vui lòng nhập Google OAuth Client ID của bạn để kết nối Google Drive:\n(Có thể lấy từ Google Cloud Console)", CLIENT_ID || '');
-                if (clientIdInput && clientIdInput.trim() !== '') {
-                    CLIENT_ID = clientIdInput.trim();
-                    localStorage.setItem('docflow_client_id', CLIENT_ID);
-                } else {
-                    showToast("Cần có Client ID để đăng nhập", true);
-                    return;
-                }
+                showToast("Vui lòng cấu hình Client ID và API Key trong phần Cài đặt trước khi đăng nhập.", true);
+                document.getElementById('settings-modal').classList.remove('hidden');
+                loadSettings();
                 
-                const apiKeyInput = prompt("Vui lòng nhập Google API Key của bạn:\n(Có thể lấy từ Google Cloud Console)", API_KEY || '');
-                if (apiKeyInput && apiKeyInput.trim() !== '') {
-                    API_KEY = apiKeyInput.trim();
-                    localStorage.setItem('docflow_api_key', API_KEY);
-                } else {
-                    showToast("Cần có API Key để sử dụng đầy đủ tính năng", true);
-                    return;
-                }
+                // Switch to API tab
+                document.querySelectorAll('.settings-tab-btn').forEach(b => {
+                    b.classList.remove('active', 'bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-100');
+                    b.classList.add('text-gray-500', 'hover:bg-gray-200');
+                });
+                document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.add('hidden'));
                 
-                // Re-init both APIs
-                gapiLoaded();
-                gisLoaded();
+                const apiTabBtn = document.querySelector('[data-tab="api-settings"]');
+                if (apiTabBtn) {
+                    apiTabBtn.classList.remove('text-gray-500', 'hover:bg-gray-200');
+                    apiTabBtn.classList.add('active', 'bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-100');
+                }
+                document.getElementById('tab-api-settings').classList.remove('hidden');
+                return;
             }
 
             // Fallback init if not ready
@@ -1939,7 +1936,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     }
 
                     const zip = new PizZipLib(data);
-                    const doc = new DocxtemplaterLib(zip, { paragraphLoop: true, linebreaks: true });
+                    const doc = new DocxtemplaterLib(zip, {
+                        paragraphLoop: true,
+                        linebreaks: true,
+                        delimiters: { start: '{', end: '}' },
+                    });
                     
                     // Lấy text thô từ TẤT CẢ các file XML trong word/ để tìm biến chính xác hơn (bao gồm header, footer, bảng)
                     let cleanText = "";
@@ -2001,6 +2002,17 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     tables['TABLE_HANG_HOA'] ||
                     tables['HANG_HOA'] ||
                     hangHoaSignals.some(sig => vars.has(sig));
+
+                // Trim tên biến có khoảng trắng (VD: " SDT_KH" → "SDT_KH")
+                // Một số file Word bị tách run tạo ra tên biến có space
+                const trimmedVars = new Set();
+                for (const v of vars) {
+                    trimmedVars.add(v.trim());
+                }
+                // Merge trimmedVars back - giữ cả bản gốc lẫn bản trim
+                for (const v of trimmedVars) {
+                    vars.add(v);
+                }
 
                 if (hasHangHoaSignal) {
                     // Đảm bảo TABLE_HANG_HOA có trong tables với đúng cột
@@ -2068,6 +2080,13 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
             // Render normal variables
             templateVariables.forEach(v => {
+                const cleanV = v.trim(); // Trim space đầu/cuối
+                if (cleanV !== v) {
+                    // Biến có space → dùng tên đã trim, lưu mapping
+                    if (!formData[cleanV] && formData[v]) formData[cleanV] = formData[v];
+                }
+                v = cleanV; // Dùng tên đã trim
+                
                 const div = document.createElement('div');
                 div.className = "flex flex-col gap-1";
                 
@@ -2875,48 +2894,76 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     }
 
                     const zip = new PizZipLib(data);
+                    // Hàm format số tiền VNĐ
+                    const fmtNum = n => {
+                        const num = parseFloat(String(n || '0').replace(/\./g, '').replace(',', '.')) || 0;
+                        return num > 0 ? Math.round(num).toLocaleString('vi-VN') : '0';
+                    };
+
+                    // Hàm parse số từ string đã format
+                    const parseNum = s => parseFloat(String(s || '0').replace(/\./g, '').replace(',', '.')) || 0;
+
+                    // ── Bước A: Chuẩn bị renderData với tất cả giá trị là string ──────────────
+                    const renderData = {};
+                    for (const [k, v] of Object.entries(finalData)) {
+                        if (Array.isArray(v)) {
+                            // Bỏ qua array — sẽ xử lý riêng bên dưới
+                            continue;
+                        }
+                        renderData[k] = (v === null || v === undefined) ? '' : String(v);
+                    }
+
+                    // Fix key SDT_KH (template có thể dùng " SDT_KH" với khoảng trắng đầu)
+                    if (renderData['SDT_KH']) {
+                        renderData[' SDT_KH'] = renderData['SDT_KH'];
+                    }
+
+                    // ── Bước B: Convert TABLE_HANG_HOA array → chuỗi text bảng ───────────────
+                    // Template dùng {TABLE_HANG_HOA} như biến ĐƠN (không phải loop)
+                    // Nên cần render thành text trước, sau đó gán vào renderData như string
+                    const hangHoaArr = finalData['TABLE_HANG_HOA'] || [];
+
+                    if (hangHoaArr.length > 0) {
+                        // Tạo chuỗi text đại diện cho bảng hàng hóa
+                        // Dùng tab/newline để tạo cấu trúc có thể đọc được
+                        const tableLines = hangHoaArr.map((row, idx) => {
+                            const sl  = parseNum(row.NUM_SL);
+                            const dg  = parseNum(row.NUM_DON_GIA);
+                            const vat = parseFloat(row.NUM_VAT || 0);
+                            const tt  = sl * dg * (1 + vat / 100);
+                            const vatStr = vat > 0 ? `${vat}%` : '0%';
+                            return [
+                                String(idx + 1),                          // STT
+                                String(row.TEN_HANG   || ''),             // Tên hàng
+                                String(row.DVT        || ''),             // ĐVT
+                                fmtNum(sl),                               // Số lượng
+                                fmtNum(dg),                               // Đơn giá
+                                vatStr,                                   // VAT
+                                fmtNum(Math.round(tt)),                   // Thành tiền
+                                String(row.GHI_CHU   || ''),             // Ghi chú
+                            ].join('\t');
+                        });
+                        renderData['TABLE_HANG_HOA'] = tableLines.join('\n');
+                    } else {
+                        renderData['TABLE_HANG_HOA'] = '(Chưa có hàng hóa)';
+                    }
+
+                    // Cũng set các biến tổng cho template
+                    renderData['TONG_CONG']       = renderData['TONG_CONG']       || '0';
+                    renderData['TONG_THANH_TOAN'] = renderData['TONG_THANH_TOAN'] || '0';
+                    renderData['TIEN_BANG_CHU']   = renderData['TIEN_BANG_CHU']   || '';
+
+                    // ── Bước C: Thay thế trực tiếp trong XML (bypass docxtemplater cho TABLE) ──
+                    // Lý do: docxtemplater không thể chèn bảng Word từ string text,
+                    // nhưng {TABLE_HANG_HOA} chỉ là text placeholder trong đoạn văn
+                    // Nên ta dùng docxtemplater với single-brace delimiter để thay thế
+
                     const doc = new DocxtemplaterLib(zip, {
                         paragraphLoop: true,
                         linebreaks: true,
                         nullGetter: () => '',
+                        delimiters: { start: '{', end: '}' },   // Template dùng single brace
                     });
-
-                    // Chuẩn bị renderData: chuyển TABLE_HANG_HOA thành HANG_HOA
-                    // vì template dùng {#HANG_HOA}...{/HANG_HOA} (không có prefix TABLE_)
-                    const renderData = {};
-                    for (const [k, v] of Object.entries(finalData)) {
-                        if (k === 'TABLE_HANG_HOA' && Array.isArray(v)) {
-                            // Đặt cả 2 key để hỗ trợ cả 2 cú pháp trong template
-                            // {#HANG_HOA}...{/HANG_HOA} và {#TABLE_HANG_HOA}...{/TABLE_HANG_HOA}
-                            const cleanRows = v.map((row, idx) => {
-                                const sl  = parseFloat(String(row.NUM_SL      || '0').replace(/\./g,'').replace(',','.')) || 0;
-                                const dg  = parseFloat(String(row.NUM_DON_GIA || '0').replace(/\./g,'').replace(',','.')) || 0;
-                                const vat = parseFloat(row.NUM_VAT || 0);
-                                const tt  = sl * dg * (1 + vat / 100);
-                                return {
-                                    STT:             String(idx + 1),
-                                    TEN_HANG:        String(row.TEN_HANG  || ''),
-                                    DVT:             String(row.DVT        || ''),
-                                    NUM_SL:          sl > 0 ? sl.toLocaleString('vi-VN') : '',
-                                    NUM_DON_GIA:     dg > 0 ? dg.toLocaleString('vi-VN') : '',
-                                    NUM_VAT:         vat > 0 ? vat + '%' : '0%',
-                                    NUM_THANH_TIEN:  tt > 0 ? Math.round(tt).toLocaleString('vi-VN') : '',
-                                    GHI_CHU:         String(row.GHI_CHU   || ''),
-                                };
-                            });
-                            renderData['HANG_HOA']       = cleanRows;
-                            renderData['TABLE_HANG_HOA'] = cleanRows;
-                        } else if (Array.isArray(v)) {
-                            // Các bảng khác: giữ nguyên, đặt cả key gốc và key bỏ prefix
-                            renderData[k] = v;
-                            if (k.startsWith('TABLE_')) {
-                                renderData[k.substring(6)] = v;
-                            }
-                        } else {
-                            // Biến thường: đảm bảo là string
-                            renderData[k] = (v === null || v === undefined) ? '' : String(v);
-                        }
-                    }
 
                     doc.render(renderData);
 
@@ -3113,6 +3160,24 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
             // Chưa có Google Sheet ID: dùng cache localStorage
             if (!SHEET_ID) {
+                showToast("Vui lòng cấu hình Google Sheet ID trong phần Cài đặt để đồng bộ.", true);
+                document.getElementById('settings-modal').classList.remove('hidden');
+                loadSettings();
+                
+                // Switch to API tab
+                document.querySelectorAll('.settings-tab-btn').forEach(b => {
+                    b.classList.remove('active', 'bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-100');
+                    b.classList.add('text-gray-500', 'hover:bg-gray-200');
+                });
+                document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.add('hidden'));
+                
+                const apiTabBtn = document.querySelector('[data-tab="api-settings"]');
+                if (apiTabBtn) {
+                    apiTabBtn.classList.remove('text-gray-500', 'hover:bg-gray-200');
+                    apiTabBtn.classList.add('active', 'bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-100');
+                }
+                document.getElementById('tab-api-settings').classList.remove('hidden');
+
                 const cached = localStorage.getItem('docflow_customers');
                 if (cached) {
                     try {
@@ -4811,7 +4876,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     }
 
                     const zip = new PizZipLib(data);
-                    const doc = new DocxtemplaterLib(zip, { paragraphLoop: true, linebreaks: true });
+                    const doc = new DocxtemplaterLib(zip, {
+                        paragraphLoop: true,
+                        linebreaks: true,
+                        delimiters: { start: '{', end: '}' },
+                    });
                     let cleanText = "";
                     try {
                         Object.keys(zip.files).forEach(fileName => {
