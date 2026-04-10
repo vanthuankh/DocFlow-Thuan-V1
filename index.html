@@ -2878,13 +2878,53 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     const doc = new DocxtemplaterLib(zip, {
                         paragraphLoop: true,
                         linebreaks: true,
+                        nullGetter: () => '',
                     });
 
-                    doc.render(finalData);
+                    // Chuẩn bị renderData: chuyển TABLE_HANG_HOA thành HANG_HOA
+                    // vì template dùng {#HANG_HOA}...{/HANG_HOA} (không có prefix TABLE_)
+                    const renderData = {};
+                    for (const [k, v] of Object.entries(finalData)) {
+                        if (k === 'TABLE_HANG_HOA' && Array.isArray(v)) {
+                            // Đặt cả 2 key để hỗ trợ cả 2 cú pháp trong template
+                            // {#HANG_HOA}...{/HANG_HOA} và {#TABLE_HANG_HOA}...{/TABLE_HANG_HOA}
+                            const cleanRows = v.map((row, idx) => {
+                                const sl  = parseFloat(String(row.NUM_SL      || '0').replace(/\./g,'').replace(',','.')) || 0;
+                                const dg  = parseFloat(String(row.NUM_DON_GIA || '0').replace(/\./g,'').replace(',','.')) || 0;
+                                const vat = parseFloat(row.NUM_VAT || 0);
+                                const tt  = sl * dg * (1 + vat / 100);
+                                return {
+                                    STT:             String(idx + 1),
+                                    TEN_HANG:        String(row.TEN_HANG  || ''),
+                                    DVT:             String(row.DVT        || ''),
+                                    NUM_SL:          sl > 0 ? sl.toLocaleString('vi-VN') : '',
+                                    NUM_DON_GIA:     dg > 0 ? dg.toLocaleString('vi-VN') : '',
+                                    NUM_VAT:         vat > 0 ? vat + '%' : '0%',
+                                    NUM_THANH_TIEN:  tt > 0 ? Math.round(tt).toLocaleString('vi-VN') : '',
+                                    GHI_CHU:         String(row.GHI_CHU   || ''),
+                                };
+                            });
+                            renderData['HANG_HOA']       = cleanRows;
+                            renderData['TABLE_HANG_HOA'] = cleanRows;
+                        } else if (Array.isArray(v)) {
+                            // Các bảng khác: giữ nguyên, đặt cả key gốc và key bỏ prefix
+                            renderData[k] = v;
+                            if (k.startsWith('TABLE_')) {
+                                renderData[k.substring(6)] = v;
+                            }
+                        } else {
+                            // Biến thường: đảm bảo là string
+                            renderData[k] = (v === null || v === undefined) ? '' : String(v);
+                        }
+                    }
+
+                    doc.render(renderData);
 
                     const out = doc.getZip().generate({
                         type: "blob",
                         mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        compression: "DEFLATE",
+                        compressionOptions: { level: 6 }
                     });
 
                     if (type === 'docx') {
