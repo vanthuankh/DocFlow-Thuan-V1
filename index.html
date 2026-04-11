@@ -405,32 +405,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Add Customer View -->
-            <div id="add-customer-view" class="main-view hidden bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-                <div class="max-w-4xl mx-auto">
-                    <div class="flex items-center gap-3 mb-8">
-                        <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-100">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-                        </div>
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-900">Thêm Khách Hàng Mới</h2>
-                            <p class="text-sm text-gray-500">Nhập thông tin chi tiết để lưu vào danh sách hệ thống</p>
-                        </div>
-                    </div>
-                    
-                    <div id="add-customer-page-container" class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                        <!-- Form will be moved here when tab active -->
-                        <p class="text-gray-500 italic text-center py-10">Đang tải biểu mẫu...</p>
-                    </div>
-                    
-                    <div class="mt-8 flex justify-end gap-3">
-                        <button id="save-customer-page-btn" class="px-10 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95">
-                            Lưu khách hàng
-                        </button>
-                    </div>
-                </div>
-            </div>
         </main>
     </div>
 
@@ -736,7 +710,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                                 <svg class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                 <div class="text-xs text-amber-800 leading-relaxed">
                                     <p class="font-bold mb-1 uppercase tracking-wider">Yêu cầu về định dạng:</p>
-                                    <p>Hệ thống chỉ hỗ trợ file <b>.docx</b> (Word) hoặc <b>.xlsx</b> (Excel). Nếu bạn đang dùng Google Docs, hãy vào <b>Tệp > Tải xuống > Microsoft Word (.docx)</b> sau đó tải file đó lên thư mục <b>DocFlow/_templates</b> trên Drive.</p>
+                                    <p>Hệ thống chỉ hỗ trợ file <b>.docx</b> (Word) hoặc <b>.xlsx</b> (Excel). Nếu bạn đang dùng Google Docs, hãy vào <b>Tệp > Tải xuống > Microsoft Word (.docx)</b> sau đó tải file đó lên thư mục <b>DocFlow/_template</b> trên Drive.</p>
                                 </div>
                             </div>
                         </div>
@@ -947,7 +921,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         </div>
     </div>
-    </div>
 
     <script>
         // --- CONFIGURATION ---
@@ -985,7 +958,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         let isDemoMode = false;
 
         let driveRootFolderId    = null;   // ID folder "DocFlow"
-        let driveTemplateFolderId = null;  // ID folder "_templates"
+        let driveTemplateFolderId = null;  // ID folder "_template"
         let driveSchemafolderId   = null;  // ID folder "_schemas"
         const driveDocFolderIds   = {};    // { 'BG': id, 'HD': id, ... }
 
@@ -1191,6 +1164,34 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             }, 3000);
         }
 
+        function handleApiError(err, defaultMsg) {
+            console.error(defaultMsg, err);
+            let errorMsg = defaultMsg;
+            
+            if (err instanceof TypeError && err.message === 'Failed to fetch') {
+                errorMsg = "Mất kết nối mạng. Vui lòng kiểm tra lại đường truyền Internet của bạn.";
+            } else if (err && err.result && err.result.error) {
+                const apiError = err.result.error;
+                if (apiError.code === 401 || apiError.code === 403) {
+                    errorMsg = "Lỗi xác thực. Vui lòng đăng nhập lại Google Drive.";
+                } else if (apiError.message) {
+                    errorMsg = `Lỗi Google Drive: ${apiError.message}`;
+                }
+            } else if (err && err.message) {
+                if (err.message.includes('network') || err.message.includes('fetch')) {
+                    errorMsg = "Mất kết nối mạng. Vui lòng kiểm tra lại đường truyền Internet của bạn.";
+                } else if (err.status === 404) {
+                    errorMsg = "Không tìm thấy tài nguyên. Vui lòng kiểm tra lại ID.";
+                } else if (err.status === 403) {
+                    errorMsg = "Không có quyền truy cập. Vui lòng kiểm tra lại quyền.";
+                } else {
+                    errorMsg = `${defaultMsg}: ${err.message}`;
+                }
+            }
+            
+            showToast(errorMsg, true);
+        }
+
         // --- GOOGLE API INITIALIZATION ---
         function gapiLoaded() {
             gapi.load('client', initializeGapiClient);
@@ -1240,7 +1241,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
                 // --- Tạo/tìm tất cả subfolder ---
                 const subfolderNames = [
-                    '_templates',
+                    '_template',
                     '_schemas',
                     ...Object.values(DOC_FOLDER_MAP),
                 ];
@@ -1272,7 +1273,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 }
 
                 // Gán vào biến
-                driveTemplateFolderId = existingFolders['_templates'];
+                driveTemplateFolderId = existingFolders['_template'];
                 driveSchemafolderId   = existingFolders['_schemas'];
                 Object.entries(DOC_FOLDER_MAP).forEach(([code, folderName]) => {
                     driveDocFolderIds[code] = existingFolders[folderName];
@@ -1289,8 +1290,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
                 console.log('DocFlow folders ready:', driveRootFolderId);
             } catch (err) {
-                console.error('Lỗi khởi tạo folder Drive:', err);
-                showToast('Lỗi tạo cấu trúc folder trên Drive', true);
+                handleApiError(err, 'Lỗi khởi tạo folder Drive');
             }
         }
 
@@ -1667,11 +1667,13 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 showToast("Lỗi khi đọc file. Vui lòng thử lại.", true);
                 event.target.value = '';
             };
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     const content = e.target.result;
                     const type = file.name.endsWith('.xlsx') ? 'xlsx' : 'docx';
-                    const templateObj = { 
+                    const mimeType = type === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                    
+                    let templateObj = { 
                         id: 'local_' + Date.now(), 
                         name: file.name, 
                         content: content,
@@ -1679,8 +1681,23 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         source: 'local'
                     };
                     
+                    // Nếu đã đăng nhập và có folder _template, lưu lên Drive
+                    if (accessToken && driveTemplateFolderId) {
+                        try {
+                            const blob = new Blob([content], { type: mimeType });
+                            const savedFile = await saveFileToDrive(blob, file.name, mimeType, null, null, driveTemplateFolderId);
+                            if (savedFile && savedFile.id) {
+                                templateObj.id = savedFile.id;
+                                templateObj.source = 'drive';
+                            }
+                        } catch (driveErr) {
+                            console.error("Lỗi khi lưu template lên Drive:", driveErr);
+                            showToast("Lưu template lên Drive thất bại, chỉ lưu tạm thời.", true);
+                        }
+                    }
+                    
                     // Check if already exists by name
-                    const existingIdx = templates.findIndex(t => t.name === file.name && t.source === 'local');
+                    const existingIdx = templates.findIndex(t => t.name === file.name && t.source === templateObj.source);
                     if (existingIdx >= 0) {
                         templates[existingIdx] = templateObj;
                     } else {
@@ -1797,8 +1814,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     reader.readAsArrayBuffer(blob);
                     return;
                 } catch (err) {
-                    console.error("Error fetching file content", err);
-                    showToast("Lỗi khi tải file từ Drive: " + err.message, true);
+                    handleApiError(err, "Lỗi khi tải file từ Drive");
                     return;
                 }
             }
@@ -3215,14 +3231,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 showToast("Đồng bộ thành công! " + customers.length + " khách hàng.");
 
                 } catch (err) {
-                    console.error("Lỗi đồng bộ Sheet:", err);
-                    if (err.status === 404) {
-                        showToast("Không tìm thấy Sheet. Vui lòng kiểm tra Sheet ID và tên Sheet (Khách Hàng).", true);
-                    } else if (err.status === 403) {
-                        showToast("Không có quyền truy cập Sheet. Đảm bảo đã bật 'Google Sheets API' trong Cloud Console và cấp quyền cho Client ID.", true);
-                    } else {
-                        showToast("Lỗi đồng bộ Google Sheets. Kiểm tra console để biết chi tiết.", true);
-                    }
+                    handleApiError(err, "Lỗi đồng bộ Sheet");
                 
                 // Fallback về cache
                 const cached = localStorage.getItem('docflow_customers');
@@ -3761,12 +3770,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 console.log("Đã lưu khách hàng lên Sheet thành công.");
                 showToast("Đã đồng bộ khách hàng lên Google Sheets");
             } catch (err) {
-                console.error("Lỗi lưu khách hàng lên Sheet:", err);
-                if (err.status === 404) {
-                    showToast("Lỗi: Không tìm thấy Sheet. Kiểm tra tên sheet 'Khách Hàng'.", true);
-                } else {
-                    showToast("Lỗi đồng bộ Google Sheets. Dữ liệu đã lưu cục bộ.", true);
-                }
+                handleApiError(err, "Lỗi lưu khách hàng lên Sheet");
             }
         }
 
@@ -3808,8 +3812,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 }
                 renderTemplateList();
             } catch (err) {
-                console.error("Error fetching from Drive", err);
-                showToast("Không thể tải danh sách file từ Drive", true);
+                handleApiError(err, "Không thể tải danh sách file từ Drive");
             }
         }
 
@@ -3831,8 +3834,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     });
                     driveDocs = response.result.files || [];
                 } catch (err) {
-                    console.error("Error fetching generated documents", err);
-                    showToast("Không thể tải danh sách tài liệu từ Drive", true);
+                    handleApiError(err, "Không thể tải danh sách tài liệu từ Drive");
                 }
             }
             
@@ -3972,8 +3974,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     showToast('Đã chuyển tài liệu vào thùng rác');
                     loadGeneratedDocuments();
                 } catch (err) {
-                    console.error('Error trashing document', err);
-                    showToast('Lỗi khi xóa tài liệu', true);
+                    handleApiError(err, 'Lỗi khi xóa tài liệu');
                 }
             });
         };
@@ -4303,8 +4304,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     loadGeneratedDocuments();
                 }
             } catch (error) {
-                console.error("Error saving to Drive:", error);
-                showToast("Lỗi khi lưu lên Drive", true);
+                handleApiError(error, "Lỗi khi lưu lên Drive");
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
@@ -4925,14 +4925,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const title = response.result.properties.title;
                 showToast(`Kết nối thành công! File: ${title}`);
             } catch (err) {
-                console.error("Lỗi kiểm tra API:", err);
-                if (err.status === 404) {
-                    showToast("Không tìm thấy Sheet ID này. Kiểm tra lại ID hoặc URL.", true);
-                } else if (err.status === 403) {
-                    showToast("Không có quyền truy cập. Đảm bảo đã bật 'Google Sheets API' và cấp quyền cho Client ID.", true);
-                } else {
-                    showToast("Lỗi kết nối API. Kiểm tra console.", true);
-                }
+                handleApiError(err, "Lỗi kiểm tra API");
             }
         });
 
@@ -5197,8 +5190,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     buildDynamicForm(); // Rebuild the form with the new schema
                 }
             } catch (err) {
-                console.error("Error saving schema:", err);
-                showToast("Lỗi khi lưu Schema", true);
+                handleApiError(err, "Lỗi khi lưu Schema");
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
