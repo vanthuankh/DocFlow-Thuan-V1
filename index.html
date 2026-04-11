@@ -1940,6 +1940,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         paragraphLoop: true,
                         linebreaks: true,
                         delimiters: { start: '{', end: '}' },
+                        nullGetter: () => '',
                     });
                     
                     // Lấy text thô từ TẤT CẢ các file XML trong word/ để tìm biến chính xác hơn (bao gồm header, footer, bảng)
@@ -2894,76 +2895,44 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     }
 
                     const zip = new PizZipLib(data);
-                    // Hàm format số tiền VNĐ
-                    const fmtNum = n => {
-                        const num = parseFloat(String(n || '0').replace(/\./g, '').replace(',', '.')) || 0;
-                        return num > 0 ? Math.round(num).toLocaleString('vi-VN') : '0';
-                    };
+                    
+                    // ── BƯỚC 1: Xử lý TABLE_HANG_HOA — inject XML bảng thực vào document.xml ──
+                    const hangHoaData = finalData['TABLE_HANG_HOA'] || [];
+                    let docXml = zip.files['word/document.xml'].asText();
 
-                    // Hàm parse số từ string đã format
-                    const parseNum = s => parseFloat(String(s || '0').replace(/\./g, '').replace(',', '.')) || 0;
+                    // Tìm đoạn <w:p>...</w:p> chứa {TABLE_HANG_HOA} và thay bằng <w:tbl>
+                    // Pattern: tìm paragraph có text chứa TABLE_HANG_HOA
+                    const tblParaRegex = /<w:p\b[^>]*>(?:[^<]|<(?!\/w:p>))*?\{TABLE_HANG_HOA\}(?:[^<]|<(?!\/w:p>))*?<\/w:p>/s;
 
-                    // ── Bước A: Chuẩn bị renderData với tất cả giá trị là string ──────────────
-                    const renderData = {};
-                    for (const [k, v] of Object.entries(finalData)) {
-                        if (Array.isArray(v)) {
-                            // Bỏ qua array — sẽ xử lý riêng bên dưới
-                            continue;
-                        }
-                        renderData[k] = (v === null || v === undefined) ? '' : String(v);
+                    if (tblParaRegex.test(docXml) && hangHoaData.length > 0) {
+                        // Tạo XML bảng Word thực sự
+                        const tableXml = buildHangHoaTableXml(hangHoaData);
+                        docXml = docXml.replace(tblParaRegex, tableXml);
+                    } else if (tblParaRegex.test(docXml) && hangHoaData.length === 0) {
+                        // Không có hàng hóa → thay bằng đoạn text thông báo
+                        const emptyPara = `<w:p><w:r><w:t>(Chưa có hàng hóa)</w:t></w:r></w:p>`;
+                        docXml = docXml.replace(tblParaRegex, emptyPara);
                     }
 
-                    // Fix key SDT_KH (template có thể dùng " SDT_KH" với khoảng trắng đầu)
-                    if (renderData['SDT_KH']) {
-                        renderData[' SDT_KH'] = renderData['SDT_KH'];
-                    }
+                    // Ghi lại XML đã sửa vào zip
+                    zip.file('word/document.xml', docXml);
 
-                    // ── Bước B: Convert TABLE_HANG_HOA array → chuỗi text bảng ───────────────
-                    // Template dùng {TABLE_HANG_HOA} như biến ĐƠN (không phải loop)
-                    // Nên cần render thành text trước, sau đó gán vào renderData như string
-                    const hangHoaArr = finalData['TABLE_HANG_HOA'] || [];
-
-                    if (hangHoaArr.length > 0) {
-                        // Tạo chuỗi text đại diện cho bảng hàng hóa
-                        // Dùng tab/newline để tạo cấu trúc có thể đọc được
-                        const tableLines = hangHoaArr.map((row, idx) => {
-                            const sl  = parseNum(row.NUM_SL);
-                            const dg  = parseNum(row.NUM_DON_GIA);
-                            const vat = parseFloat(row.NUM_VAT || 0);
-                            const tt  = sl * dg * (1 + vat / 100);
-                            const vatStr = vat > 0 ? `${vat}%` : '0%';
-                            return [
-                                String(idx + 1),                          // STT
-                                String(row.TEN_HANG   || ''),             // Tên hàng
-                                String(row.DVT        || ''),             // ĐVT
-                                fmtNum(sl),                               // Số lượng
-                                fmtNum(dg),                               // Đơn giá
-                                vatStr,                                   // VAT
-                                fmtNum(Math.round(tt)),                   // Thành tiền
-                                String(row.GHI_CHU   || ''),             // Ghi chú
-                            ].join('\t');
-                        });
-                        renderData['TABLE_HANG_HOA'] = tableLines.join('\n');
-                    } else {
-                        renderData['TABLE_HANG_HOA'] = '(Chưa có hàng hóa)';
-                    }
-
-                    // Cũng set các biến tổng cho template
-                    renderData['TONG_CONG']       = renderData['TONG_CONG']       || '0';
-                    renderData['TONG_THANH_TOAN'] = renderData['TONG_THANH_TOAN'] || '0';
-                    renderData['TIEN_BANG_CHU']   = renderData['TIEN_BANG_CHU']   || '';
-
-                    // ── Bước C: Thay thế trực tiếp trong XML (bypass docxtemplater cho TABLE) ──
-                    // Lý do: docxtemplater không thể chèn bảng Word từ string text,
-                    // nhưng {TABLE_HANG_HOA} chỉ là text placeholder trong đoạn văn
-                    // Nên ta dùng docxtemplater với single-brace delimiter để thay thế
-
+                    // ── BƯỚC 2: Dùng docxtemplater thay các biến thường (không phải bảng) ──────
                     const doc = new DocxtemplaterLib(zip, {
                         paragraphLoop: true,
                         linebreaks: true,
                         nullGetter: () => '',
-                        delimiters: { start: '{', end: '}' },   // Template dùng single brace
+                        delimiters: { start: '{', end: '}' },
                     });
+
+                    const renderData = {};
+                    for (const [k, v] of Object.entries(finalData)) {
+                        if (Array.isArray(v)) continue; // Bảng đã xử lý ở trên
+                        renderData[k] = (v === null || v === undefined) ? '' : String(v);
+                    }
+
+                    // Fix " SDT_KH" có khoảng trắng đầu (do Word tách run)
+                    if (renderData['SDT_KH']) renderData[' SDT_KH'] = renderData['SDT_KH'];
 
                     doc.render(renderData);
 
@@ -4559,6 +4528,220 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             return computed;
         }
 
+        function buildHangHoaTableXml(hangHoaArr) {
+            // Helper: parse số từ string đã format (có dấu . phân cách nghìn)
+            const parseNum = s =>
+                parseFloat(String(s || '0').replace(/\./g, '').replace(',', '.')) || 0;
+
+            // Helper: format số thành chuỗi VNĐ (dấu . nghìn, dấu , thập phân)
+            const fmtVND = n => Math.round(n).toLocaleString('vi-VN');
+
+            // Helper: XML cho border của cell
+            const borders = `<w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            </w:tcBorders>`;
+
+            // Helper: font run properties
+            const fontRpr = (bold = false, size = 20) => `<w:rPr>
+                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>
+                ${bold ? '<w:b/><w:bCs/>' : ''}
+                <w:sz w:val="${size}"/><w:szCs w:val="${size}"/>
+            </w:rPr>`;
+
+            // Helper: tạo 1 cell
+            const cell = (width, text, align = 'left', bold = false, shade = '') =>
+                `<w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="${width}" w:type="dxa"/>
+                        ${borders}
+                        ${shade ? `<w:shd w:val="clear" w:color="auto" w:fill="${shade}"/>` : ''}
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr>
+                            <w:jc w:val="${align}"/>
+                            <w:spacing w:before="40" w:after="40"/>
+                            <w:rPr>${fontRpr(bold)}</w:rPr>
+                        </w:pPr>
+                        <w:r>
+                            <w:rPr>${fontRpr(bold)}</w:rPr>
+                            <w:t xml:space="preserve">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</w:t>
+                        </w:r>
+                    </w:p>
+                </w:tc>`;
+
+            // ── Hàng tiêu đề ──────────────────────────────────────────────────────
+            const headerRow = `<w:tr>
+                <w:trPr>
+                    <w:trHeight w:val="400" w:hRule="atLeast"/>
+                    <w:tblHeader/>
+                </w:trPr>
+                ${cell(500,  'STT',                   'center', true, 'D9E2F3')}
+                ${cell(3900, 'Tên hàng hóa / Dịch vụ','center', true, 'D9E2F3')}
+                ${cell(700,  'ĐVT',                   'center', true, 'D9E2F3')}
+                ${cell(900,  'Số lượng',              'center', true, 'D9E2F3')}
+                ${cell(1500, 'Đơn giá (VNĐ)',         'center', true, 'D9E2F3')}
+                ${cell(684,  'Thuế GTGT',             'center', true, 'D9E2F3')}
+                ${cell(2000, 'Thành tiền (VNĐ)',      'center', true, 'D9E2F3')}
+            </w:tr>`;
+
+            // ── Các hàng dữ liệu ──────────────────────────────────────────────────
+            let tongTruocThue = 0;
+            let tongThue = 0;
+
+            const dataRows = hangHoaArr.map((row, idx) => {
+                const sl  = parseNum(row.NUM_SL);
+                const dg  = parseNum(row.NUM_DON_GIA);
+                const vat = parseFloat(row.NUM_VAT || 0);
+                const truocThue = sl * dg;
+                const tienThue  = truocThue * vat / 100;
+                const tt        = truocThue + tienThue;
+                tongTruocThue  += truocThue;
+                tongThue       += tienThue;
+
+                const vatStr = vat > 0 ? `${vat}%` : '0%';
+                const shade  = idx % 2 === 1 ? 'F2F2F2' : '';
+
+                return `<w:tr>
+                    <w:trPr><w:trHeight w:val="360" w:hRule="atLeast"/></w:trPr>
+                    ${cell(500,  String(idx + 1),          'center', false, shade)}
+                    ${cell(3900, String(row.TEN_HANG || ''),'left',   false, shade)}
+                    ${cell(700,  String(row.DVT || ''),     'center', false, shade)}
+                    ${cell(900,  sl > 0 ? fmtVND(sl) : '', 'right',  false, shade)}
+                    ${cell(1500, dg > 0 ? fmtVND(dg) : '', 'right',  false, shade)}
+                    ${cell(684,  vatStr,                    'center', false, shade)}
+                    ${cell(2000, tt > 0 ? fmtVND(tt) : '', 'right',  false, shade)}
+                </w:tr>`;
+            });
+
+            const tongSauThue = tongTruocThue + tongThue;
+
+            // ── Hàng tổng cộng ────────────────────────────────────────────────────
+            // Helper: cell merge (span nhiều cột)
+            const cellMerge = (width, text, align = 'right', bold = true, shade = 'EBF3FB') =>
+                `<w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="${width}" w:type="dxa"/>
+                        ${borders}
+                        ${shade ? `<w:shd w:val="clear" w:color="auto" w:fill="${shade}"/>` : ''}
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr>
+                            <w:jc w:val="${align}"/>
+                            <w:spacing w:before="60" w:after="60"/>
+                            <w:rPr>${fontRpr(bold)}</w:rPr>
+                        </w:pPr>
+                        <w:r>
+                            <w:rPr>${fontRpr(bold)}</w:rPr>
+                            <w:t xml:space="preserve">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</w:t>
+                        </w:r>
+                    </w:p>
+                </w:tc>`;
+
+            // Cột "label" span 6 cột đầu = 500+3900+700+900+1500+684 = 8184
+            // Cột "value" = 2000
+            const totalLabelWidth = 8184;
+
+            const rowTruocThue = `<w:tr>
+                <w:trPr><w:trHeight w:val="360" w:hRule="atLeast"/></w:trPr>
+                <w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="${totalLabelWidth}" w:type="dxa"/>
+                        <w:gridSpan w:val="6"/>
+                        ${borders}
+                        <w:shd w:val="clear" w:color="auto" w:fill="EBF3FB"/>
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr><w:jc w:val="right"/><w:spacing w:before="60" w:after="60"/>
+                            <w:rPr>${fontRpr(false)}</w:rPr>
+                        </w:pPr>
+                        <w:r><w:rPr>${fontRpr(false)}</w:rPr>
+                            <w:t>Cộng tiền hàng (chưa thuế):</w:t>
+                        </w:r>
+                    </w:p>
+                </w:tc>
+                ${cellMerge(2000, fmtVND(tongTruocThue), 'right', false)}
+            </w:tr>`;
+
+            const rowThue = `<w:tr>
+                <w:trPr><w:trHeight w:val="360" w:hRule="atLeast"/></w:trPr>
+                <w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="${totalLabelWidth}" w:type="dxa"/>
+                        <w:gridSpan w:val="6"/>
+                        ${borders}
+                        <w:shd w:val="clear" w:color="auto" w:fill="EBF3FB"/>
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr><w:jc w:val="right"/><w:spacing w:before="60" w:after="60"/>
+                            <w:rPr>${fontRpr(false)}</w:rPr>
+                        </w:pPr>
+                        <w:r><w:rPr>${fontRpr(false)}</w:rPr>
+                            <w:t>Tổng thuế GTGT:</w:t>
+                        </w:r>
+                    </w:p>
+                </w:tc>
+                ${cellMerge(2000, fmtVND(tongThue), 'right', false)}
+            </w:tr>`;
+
+            const rowSauThue = `<w:tr>
+                <w:trPr><w:trHeight w:val="420" w:hRule="atLeast"/></w:trPr>
+                <w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="${totalLabelWidth}" w:type="dxa"/>
+                        <w:gridSpan w:val="6"/>
+                        ${borders}
+                        <w:shd w:val="clear" w:color="auto" w:fill="C9DAF8"/>
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr><w:jc w:val="right"/><w:spacing w:before="60" w:after="60"/>
+                            <w:rPr>${fontRpr(true)}</w:rPr>
+                        </w:pPr>
+                        <w:r><w:rPr>${fontRpr(true)}</w:rPr>
+                            <w:t>TỔNG CỘNG (đã bao gồm thuế):</w:t>
+                        </w:r>
+                    </w:p>
+                </w:tc>
+                ${cellMerge(2000, fmtVND(tongSauThue), 'right', true, 'C9DAF8')}
+            </w:tr>`;
+
+            // ── Ghép thành bảng hoàn chỉnh ────────────────────────────────────────
+            const tblXml = `<w:tbl>
+                <w:tblPr>
+                    <w:tblStyle w:val="TableGrid"/>
+                    <w:tblW w:w="10184" w:type="dxa"/>
+                    <w:tblInd w:w="-426" w:type="dxa"/>
+                    <w:tblBorders>
+                        <w:top    w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:left   w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:right  w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                    </w:tblBorders>
+                    <w:tblLook w:val="04A0"/>
+                </w:tblPr>
+                <w:tblGrid>
+                    <w:gridCol w:w="500"/>
+                    <w:gridCol w:w="3900"/>
+                    <w:gridCol w:w="700"/>
+                    <w:gridCol w:w="900"/>
+                    <w:gridCol w:w="1500"/>
+                    <w:gridCol w:w="684"/>
+                    <w:gridCol w:w="2000"/>
+                </w:tblGrid>
+                ${headerRow}
+                ${dataRows.join('')}
+                ${rowTruocThue}
+                ${rowThue}
+                ${rowSauThue}
+            </w:tbl>`;
+
+            return tblXml;
+        }
+
         function updateTotals() {
             const computed = computeFields(formData);
 
@@ -4880,6 +5063,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         paragraphLoop: true,
                         linebreaks: true,
                         delimiters: { start: '{', end: '}' },
+                        nullGetter: () => '',
                     });
                     let cleanText = "";
                     try {
