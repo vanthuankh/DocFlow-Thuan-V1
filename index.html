@@ -68,18 +68,37 @@
                 
                 <!-- Main Navigation -->
                 <nav id="main-nav" class="hidden md:flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-                    <button class="main-nav-btn active px-4 py-2 rounded-md text-sm font-medium bg-white text-blue-700 shadow-sm transition" data-view="editor-view">
-                        Soạn thảo
-                    </button>
                     <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition" data-view="customers-view">
-                        Khách hàng
+                        Quản lý khách hàng
                     </button>
-                    <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition" data-view="add-customer-view">
-                        Thêm khách hàng
-                    </button>
-                    <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition" data-view="documents-view">
-                        Tài liệu đã tạo
-                    </button>
+                    
+                    <div class="relative group">
+                        <button class="main-nav-btn active px-4 py-2 rounded-md text-sm font-medium bg-white text-blue-700 shadow-sm transition flex items-center gap-1" data-view="editor-view">
+                            Mẫu tài liệu
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div class="absolute left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('BG'); return false;">Báo giá</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('HD'); return false;">Hợp đồng</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('BBGH'); return false;">Biên bản giao hàng</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('DNTT'); return false;">Đề nghị thanh toán</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('PL'); return false;">Phụ lục hợp đồng</a>
+                        </div>
+                    </div>
+
+                    <div class="relative group">
+                        <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition flex items-center gap-1" data-view="documents-view">
+                            Quản lý tài liệu
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div class="absolute left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('BG'); return false;">Báo giá</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('HD'); return false;">Hợp đồng</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('BBGH'); return false;">Biên bản giao hàng</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('DNTT'); return false;">Đề nghị thanh toán</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('PL'); return false;">Phụ lục hợp đồng</a>
+                        </div>
+                    </div>
                 </nav>
             </div>
             <div id="auth-container">
@@ -319,13 +338,14 @@
                                     <th scope="col" class="px-6 py-4 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Mã số thuế</th>
                                     <th scope="col" class="px-6 py-4 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Liên hệ chính</th>
                                     <th scope="col" class="px-6 py-4 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Địa chỉ</th>
+                                    <th scope="col" class="px-6 py-4 font-bold text-gray-700 uppercase tracking-wider text-[11px]">Loại TL</th>
                                     <th scope="col" class="px-6 py-4 font-bold text-gray-700 uppercase tracking-wider text-[11px] text-center">Trạng thái</th>
                                     <th scope="col" class="px-6 py-4 font-bold text-gray-700 uppercase tracking-wider text-[11px] text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody id="customer-list-body" class="divide-y divide-gray-100">
                                 <tr>
-                                    <td colspan="6" class="px-6 py-20 text-center">
+                                    <td colspan="7" class="px-6 py-20 text-center">
                                         <div class="flex flex-col items-center justify-center text-gray-400">
                                             <svg class="w-12 h-12 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                                             <p class="text-base font-medium">Vui lòng đăng nhập để xem danh sách khách hàng</p>
@@ -1259,6 +1279,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const subfolderNames = [
                     '_template',
                     '_schemas',
+                    'Khach_hang',
                     ...Object.values(DOC_FOLDER_MAP),
                 ];
 
@@ -1632,6 +1653,15 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         let currentView = 'editor-view';
 
         function switchView(viewId) {
+            if (viewId === 'editor-view') {
+                // If called from the main nav button (not a dropdown item), clear filter
+                try {
+                    if (window.event && !window.event.target?.closest('.absolute')) {
+                        currentTemplateFilter = '';
+                        renderTemplateList();
+                    }
+                } catch(e) {}
+            }
             document.querySelectorAll('.main-view').forEach(v => {
                 v.classList.add('hidden');
                 v.style.display = 'none';
@@ -1734,16 +1764,37 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             reader.readAsArrayBuffer(file);
         }
 
+        let currentTemplateFilter = '';
+
+        window.filterTemplates = function(type) {
+            switchView('editor-view');
+            currentTemplateFilter = type;
+            renderTemplateList();
+        };
+
+        window.filterDocuments = function(type) {
+            switchView('documents-view');
+            const filter = document.getElementById('doc-type-filter');
+            if (filter) {
+                filter.value = type;
+                renderDocumentList(document.getElementById('document-search')?.value || '');
+            }
+        };
+
         function renderTemplateList() {
             const list = document.getElementById('template-list');
             list.innerHTML = '';
             
-            if (templates.length === 0) {
+            const filteredTemplates = currentTemplateFilter 
+                ? templates.filter(t => detectDocTypeFromName(t.name) === currentTemplateFilter)
+                : templates;
+
+            if (filteredTemplates.length === 0) {
                 list.innerHTML = '<li class="text-gray-500 text-sm italic text-center py-4">Chưa có biểu mẫu nào.</li>';
                 return;
             }
 
-            templates.forEach(t => {
+            filteredTemplates.forEach(t => {
                 const li = document.createElement('li');
                 li.dataset.name = t.name;
                 const isSelected = currentTemplate && currentTemplate.id === t.id;
@@ -3264,7 +3315,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             if (!customers || customers.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-20 text-center">
+                        <td colspan="7" class="px-6 py-20 text-center">
                             <div class="flex flex-col items-center justify-center text-gray-400">
                                 <svg class="w-12 h-12 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                                 <p class="text-base font-medium">Chưa có dữ liệu khách hàng</p>
@@ -3294,7 +3345,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             if (filtered.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="px-6 py-20 text-center text-gray-400">
+                        <td colspan="7" class="px-6 py-20 text-center text-gray-400">
                             <p class="text-base font-medium">Không tìm thấy khách hàng nào phù hợp</p>
                         </td>
                     </tr>
@@ -3307,6 +3358,21 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const statusBadge = c.trang_thai === 'Tạm dừng'
                   ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-100">Tạm dừng</span>'
                   : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">Hoạt động</span>';
+
+                const TYPE_LABELS = { BG:'Báo Giá', HD:'Hợp Đồng', BBGH:'BBGH', DNTT:'ĐNTT', PL:'Phụ Lục', BBNT:'BBNT' };
+                const TYPE_COLORS = {
+                    BG:   'bg-blue-100 text-blue-800',
+                    HD:   'bg-purple-100 text-purple-800',
+                    BBGH: 'bg-amber-100 text-amber-800',
+                    DNTT: 'bg-teal-100 text-teal-800',
+                    PL:   'bg-indigo-100 text-indigo-800',
+                    BBNT: 'bg-gray-100 text-gray-800',
+                };
+                const customerDocs = generatedDocuments.filter(d => d.appProperties?.customerName === c.ten_cong_ty);
+                const docTypes = [...new Set(customerDocs.map(d => (typeof detectDocTypeFromName === 'function') ? detectDocTypeFromName(d.name) : '').filter(Boolean))];
+                const docTypeBadges = docTypes.length > 0 
+                    ? `<div class="flex flex-wrap gap-1">` + docTypes.map(type => `<span class="px-2 py-0.5 rounded text-[10px] font-semibold ${TYPE_COLORS[type] || 'bg-gray-100 text-gray-700'}" title="${TYPE_LABELS[type] || type}">${type}</span>`).join('') + `</div>`
+                    : `<span class="text-xs text-gray-400 italic">Chưa có</span>`;
 
                 return `
                   <tr class="group hover:bg-blue-50/30 transition-all duration-200">
@@ -3339,6 +3405,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                       <div class="text-xs text-gray-500 max-w-[180px] line-clamp-2" title="${c.dia_chi || ''}">
                         ${c.dia_chi || '—'}
                       </div>
+                    </td>
+                    <td class="px-6 py-4">
+                      ${docTypeBadges}
                     </td>
                     <td class="px-6 py-4 text-center">${statusBadge}</td>
                     <td class="px-6 py-4 text-right">
@@ -4533,7 +4602,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 String(today.getDate()).padStart(2, '0'),
                 String(today.getMonth() + 1).padStart(2, '0'),
                 today.getFullYear()
-            ].join('-');
+            ].join('');
 
             // Lấy tên KH viết tắt — ưu tiên ten_viet_tat, nếu không có thì rút gọn
             function getClientShort() {
@@ -4553,21 +4622,23 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             }
 
             const clientShort = getClientShort();
-            const docNum   = formData['MA_TAI_LIEU'] || formData['SO_TAI_LIEU'] || '';
-            const relatedBG = formData['SO_BAO_GIA']  || formData['SO_TAI_LIEU_GOC'] || '';
-            const relatedHD = formData['SO_HOP_DONG'] || formData['SO_TAI_LIEU_GOC'] || '';
+            const docNum   = formData['MA_TAI_LIEU'] || formData['SO_TAI_LIEU'] || formData['MA_HOP_DONG'] || '';
+            const relatedBG = formData['SO_BAO_GIA']  || formData['MA_BAO_GIA'] || formData['SO_TAI_LIEU_GOC'] || '';
+            const relatedHD = formData['SO_HOP_DONG'] || formData['MA_HOP_DONG'] || formData['SO_TAI_LIEU_GOC'] || '';
+            const phienBan = formData['PHIEN_BAN'] || 'v1';
+            const soPhuLuc = formData['SO_PHU_LUC'] || formData['MA_TAI_LIEU'] || '';
             const ext = extension || 'docx';
 
             const names = {
-                BG:   `Bao_Gia - ${clientShort} - ${docNum} - ${dateStr}.${ext}`,
-                HD:   `HD - ${docNum} - ${clientShort}${relatedBG ? ' - ' + relatedBG : ''}.${ext}`,
-                PL:   `PL - ${docNum} - ${clientShort}${relatedHD ? ' - ' + relatedHD : ''}.${ext}`,
-                BBGH: `BBGH - ${docNum} - ${clientShort}${relatedHD || relatedBG ? ' - ' + (relatedHD || relatedBG) : ''}.${ext}`,
-                BBNT: `BBNT - ${docNum} - ${clientShort}${relatedHD ? ' - ' + relatedHD : ''}.${ext}`,
-                DNTT: `DNTT - ${docNum} - ${clientShort}${relatedHD ? ' - ' + relatedHD : ''}.${ext}`,
+                BG:   `BG-${docNum}-${clientShort}-${dateStr}-${phienBan}.${ext}`,
+                HD:   `HD-${docNum}-${relatedBG ? relatedBG + '-' : ''}${clientShort}-${dateStr}-${phienBan}.${ext}`,
+                PL:   `PLHD-${relatedHD ? relatedHD + '-' : ''}${clientShort}-${soPhuLuc}.${ext}`,
+                BBGH: `BBGH-${relatedBG ? relatedBG + '-' : ''}${clientShort}-${dateStr}-${phienBan}.${ext}`,
+                BBNT: `BBNT-${docNum}-${clientShort}-${dateStr}-${phienBan}.${ext}`,
+                DNTT: `DNTT-${relatedHD ? relatedHD + '-' : ''}${clientShort}-${dateStr}-${phienBan}.${ext}`,
             };
 
-            return names[docTypeCode] || `${docTypeCode} - ${clientShort} - ${docNum} - ${dateStr}.${ext}`;
+            return names[docTypeCode] || `${docTypeCode}-${docNum}-${clientShort}-${dateStr}-${phienBan}.${ext}`;
         }
 
         function detectDocTypeFromName(name) {
