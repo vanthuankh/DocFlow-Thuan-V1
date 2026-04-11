@@ -350,6 +350,21 @@
                                 </div>
                                 <input type="text" id="document-search" class="block w-64 p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500" placeholder="Tìm kiếm tài liệu...">
                             </div>
+                            <!-- Filter loại tài liệu -->
+                            <select id="doc-type-filter"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Tất cả loại</option>
+                                <option value="BG">Báo Giá</option>
+                                <option value="HD">Hợp Đồng</option>
+                                <option value="BBGH">Biên Bản Giao Hàng</option>
+                                <option value="DNTT">Đề Nghị Thanh Toán</option>
+                            </select>
+
+                            <!-- Filter khách hàng -->
+                            <select id="doc-customer-filter"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Tất cả khách hàng</option>
+                            </select>
                             <button id="refresh-docs-btn" class="p-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition" title="Làm mới">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                             </button>
@@ -361,6 +376,7 @@
                             <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
                                 <tr>
                                     <th scope="col" class="px-6 py-3">Tên tài liệu</th>
+                                    <th scope="col" class="px-4 py-3 font-semibold" style="width:8%">Loại</th>
                                     <th scope="col" class="px-6 py-3">Biểu mẫu gốc</th>
                                     <th scope="col" class="px-6 py-3">Khách hàng</th>
                                     <th scope="col" class="px-6 py-3">Người tạo</th>
@@ -370,7 +386,7 @@
                             </thead>
                             <tbody id="document-list-body">
                                 <tr>
-                                    <td colspan="6" class="px-6 py-10 text-center text-gray-500">
+                                    <td colspan="7" class="px-6 py-10 text-center text-gray-500">
                                         Vui lòng đăng nhập để xem danh sách tài liệu.
                                     </td>
                                 </tr>
@@ -3327,6 +3343,29 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     <td class="px-6 py-4 text-center">${statusBadge}</td>
                     <td class="px-6 py-4 text-right">
                       <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div class="relative inline-block" id="newdoc-${c.id}">
+                            <button onclick="toggleNewDocMenu('${c.id}')"
+                                    class="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg hover:bg-blue-700 font-medium inline-flex items-center gap-1 transition-all active:scale-95">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                Tạo tài liệu
+                            </button>
+                            <div id="newdoc-menu-${c.id}"
+                                 class="hidden absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-30 min-w-[220px] py-2">
+                                <div class="px-3 py-1 mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tạo tài liệu mới cho ${c.ten_cong_ty}</div>
+                                ${[
+                                    { code: 'BG',   label: '📄 Tạo Báo Giá',              color: 'text-blue-700 hover:bg-blue-50' },
+                                    { code: 'HD',   label: '📝 Tạo Hợp Đồng',             color: 'text-purple-700 hover:bg-purple-50' },
+                                    { code: 'BBGH', label: '📦 Tạo Biên Bản Giao Hàng',   color: 'text-amber-700 hover:bg-amber-50' },
+                                    { code: 'DNTT', label: '💰 Tạo Đề Nghị Thanh Toán',   color: 'text-teal-700 hover:bg-teal-50' },
+                                ].map(dt => `
+                                    <button onclick="createDocForCustomer('${c.id}', '${dt.code}')"
+                                            class="w-full text-left px-4 py-2.5 text-sm ${dt.color} flex items-center gap-2 transition-colors">
+                                        ${dt.label}
+                                    </button>`).join('')}
+                            </div>
+                        </div>
                         <button class="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                                 onclick="editCustomer('${c.id}')" title="Chỉnh sửa">
                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -3356,6 +3395,55 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     showToast("Đã xóa khách hàng");
                 }
             );
+        };
+
+        window.toggleNewDocMenu = function(custId) {
+            // Đóng tất cả menu khác
+            document.querySelectorAll('[id^="newdoc-menu-"]').forEach(el => {
+                if (el.id !== 'newdoc-menu-' + custId) el.classList.add('hidden');
+            });
+            const menu = document.getElementById('newdoc-menu-' + custId);
+            if (menu) menu.classList.toggle('hidden');
+        };
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('[id^="newdoc-"]')) {
+                document.querySelectorAll('[id^="newdoc-menu-"]').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
+        window.createDocForCustomer = function(custId, docTypeCode) {
+            document.querySelectorAll('[id^="newdoc-menu-"]').forEach(el => el.classList.add('hidden'));
+
+            const customer = customers.find(c => c.id === custId);
+            if (!customer) { showToast('Không tìm thấy khách hàng', true); return; }
+
+            // Tìm template phù hợp với loại tài liệu
+            const TYPE_KEYWORDS = {
+                BG:   ['bao_gia','bao-gia','báo giá','quotation','bg-'],
+                HD:   ['hop_dong','hop-dong','hợp đồng','contract','hd-'],
+                BBGH: ['giao_hang','giao-hang','giao hàng','delivery','bbgh-'],
+                DNTT: ['thanh_toan','thanh-toan','thanh toán','payment','dntt-'],
+            };
+            const keywords = TYPE_KEYWORDS[docTypeCode] || [];
+            const matchedTemplate = templates.find(t =>
+                keywords.some(kw => t.name.toLowerCase().includes(kw))
+            );
+
+            if (!matchedTemplate) {
+                const typeLabel = { BG:'Báo Giá', HD:'Hợp Đồng', BBGH:'Biên Bản Giao Hàng', DNTT:'Đề Nghị Thanh Toán' };
+                showToast(`Chưa có template "${typeLabel[docTypeCode] || docTypeCode}". Upload template vào Settings trước.`, true);
+                return;
+            }
+
+            // Chọn template và điền thông tin khách hàng
+            selectTemplate(matchedTemplate);
+            selectCustomer(custId);
+
+            // Chuyển sang tab Soạn thảo
+            document.querySelector('[data-view="editor-view"]')?.click();
+
+            showToast(`Đã tải template ${matchedTemplate.name} cho ${customer.ten_cong_ty}`);
         };
 
         function searchCustomers(query) {
@@ -3595,12 +3683,23 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         document.getElementById('customer-search').addEventListener('input', debouncedRenderCustomerList);
         document.getElementById('customer-status-filter').addEventListener('change', renderCustomerList);
 
-        document.getElementById('sync-customers-btn').addEventListener('click', () => {
-            showToast("Đang đồng bộ dữ liệu khách hàng...");
-            setTimeout(() => {
-                syncCustomersFromSheet();
-                showToast("Đồng bộ thành công!");
-            }, 1000);
+        document.getElementById('sync-customers-btn').addEventListener('click', async () => {
+            if (!SHEET_ID) {
+                showToast('Chưa cấu hình Sheet ID. Vào Settings → Cài đặt API.', true);
+                return;
+            }
+            if (!accessToken) {
+                showToast('Vui lòng đăng nhập Google trước khi đồng bộ.', true);
+                return;
+            }
+            const btn = document.getElementById('sync-customers-btn');
+            const original = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner border-gray-600 border-t-transparent"></span>';
+            btn.disabled = true;
+            customers = []; // Force re-sync
+            await syncCustomersFromSheet();
+            btn.innerHTML = original;
+            btn.disabled = false;
         });
 
         // Customer Modal Listeners
@@ -3704,73 +3803,47 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         });
 
         async function appendCustomerToSheet(customer) {
-            if (!gapiInited || !accessToken || !SHEET_ID) {
-                console.warn("GAPI, Access Token or SHEET_ID not ready for append");
-                return;
-            }
-
-            if (!gapi.client.sheets) {
-                console.error("Sheets API not loaded for append");
-                return;
-            }
-
+            if (!accessToken || !SHEET_ID) return;
             try {
-                const mainContact = (customer.lien_he || []).find(c => c.la_chinh) || (customer.lien_he || [])[0] || {};
-
-                const values = [[
-                    customer.id,
-                    customer.ten_cong_ty,
-                    customer.ten_viet_tat || '',
-                    customer.dia_chi || '',
-                    customer.trang_thai || 'Hoạt động',
-                    customer.mst || '',
-                    customer.sdt || '',
-                    customer.email || '',
-                    customer.nguoi_dai_dien || mainContact.ten || '',
-                    customer.chuc_vu || mainContact.chuc_vu || '',
-                    new Date().toISOString().split('T')[0],  // ngay_tao
-                    new Date().toISOString().split('T')[0],  // cap_nhat
-                    customer.trang_thai || 'Hoạt động'
-                ]];
-
+                const today = new Date().toISOString().split('T')[0];
+                // Sheet "Khách Hàng" — 13 cột A:M
                 await gapi.client.sheets.spreadsheets.values.append({
                     spreadsheetId: SHEET_ID,
                     range: 'Khách Hàng!A:M',
                     valueInputOption: 'USER_ENTERED',
                     insertDataOption: 'INSERT_ROWS',
-                    resource: { values }
+                    resource: { values: [[
+                        customer.id, customer.ten_cong_ty, customer.ten_viet_tat || '',
+                        customer.dia_chi || '', customer.tinh_thanh || '',
+                        customer.mst || '', customer.sdt || '', customer.email || '',
+                        customer.nguoi_dai_dien || '', customer.chuc_vu || '',
+                        customer.ghi_chu || '', today,
+                        customer.trang_thai || 'Hoạt động'
+                    ]] }
                 });
-
-                // Ghi thêm từng người liên hệ vào sheet "Người Liên Hệ"
-                if (customer.lien_he && customer.lien_he.length > 0) {
-                    const contactRows = customer.lien_he
-                        .filter(c => c.ten)
-                        .map(c => [
-                            c.id || ('lh_' + Date.now() + Math.random().toString(36).slice(2,5)),
-                            customer.id,
-                            c.ten,
-                            c.chuc_vu || '',
-                            c.sdt || '',
-                            c.email || '',
-                            c.la_chinh ? 'yes' : 'no',
-                            ''
-                        ]);
-
-                    if (contactRows.length > 0) {
+                // Sheet "Người Liên Hệ" — 8 cột A:H
+                const contacts = customer.lien_he || [];
+                if (contacts.length > 0) {
+                    const ctRows = contacts.filter(c => c.ten).map(c => [
+                        c.id || ('lh_' + Date.now()),
+                        customer.id, c.ten, c.chuc_vu || '',
+                        c.sdt || '', c.email || '',
+                        c.la_chinh ? 'yes' : 'no', ''
+                    ]);
+                    if (ctRows.length > 0) {
                         await gapi.client.sheets.spreadsheets.values.append({
                             spreadsheetId: SHEET_ID,
                             range: 'Người Liên Hệ!A:H',
                             valueInputOption: 'USER_ENTERED',
                             insertDataOption: 'INSERT_ROWS',
-                            resource: { values: contactRows }
+                            resource: { values: ctRows }
                         });
                     }
                 }
-
-                console.log("Đã lưu khách hàng lên Sheet thành công.");
-                showToast("Đã đồng bộ khách hàng lên Google Sheets");
+                showToast('Đã lưu khách hàng lên Google Sheet!');
             } catch (err) {
-                handleApiError(err, "Lỗi lưu khách hàng lên Sheet");
+                console.error('Lỗi lưu Sheet:', err);
+                showToast('Lưu local OK. Lỗi đồng bộ Sheet: ' + (err.result?.error?.message || err.message || ''), true);
             }
         }
 
@@ -3847,99 +3920,128 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         function renderDocumentList(filterTerm = '') {
             const tbody = document.getElementById('document-list-body');
             tbody.innerHTML = '';
-            
-            const filteredDocs = generatedDocuments.filter(doc => 
-                doc.name.toLowerCase().includes(filterTerm.toLowerCase()) ||
-                (doc.appProperties && doc.appProperties.customerName && doc.appProperties.customerName.toLowerCase().includes(filterTerm.toLowerCase()))
-            );
-            
-            if (filteredDocs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">Không tìm thấy tài liệu nào.</td></tr>';
+
+            const typeFilter = (document.getElementById('doc-type-filter')?.value) || '';
+            const custFilter = (document.getElementById('doc-customer-filter')?.value) || '';
+
+            // Cập nhật dropdown khách hàng
+            const custSelect = document.getElementById('doc-customer-filter');
+            if (custSelect) {
+                const currentVal = custSelect.value;
+                const custNames = [...new Set(
+                    generatedDocuments
+                        .map(d => d.appProperties?.customerName)
+                        .filter(Boolean)
+                )].sort();
+                custSelect.innerHTML = '<option value="">Tất cả khách hàng</option>' +
+                    custNames.map(n => `<option value="${n}" ${n===currentVal?'selected':''}>${n}</option>`).join('');
+            }
+
+            const TYPE_LABELS = { BG:'Báo Giá', HD:'Hợp Đồng', BBGH:'BBGH', DNTT:'ĐNTT', PL:'Phụ Lục', BBNT:'BBNT' };
+            const TYPE_COLORS = {
+                BG:   'bg-blue-100 text-blue-800',
+                HD:   'bg-purple-100 text-purple-800',
+                BBGH: 'bg-amber-100 text-amber-800',
+                DNTT: 'bg-teal-100 text-teal-800',
+                PL:   'bg-indigo-100 text-indigo-800',
+                BBNT: 'bg-gray-100 text-gray-800',
+            };
+
+            const filtered = generatedDocuments.filter(doc => {
+                const term = filterTerm.toLowerCase();
+                const matchTerm = !term ||
+                    doc.name.toLowerCase().includes(term) ||
+                    (doc.appProperties?.customerName || '').toLowerCase().includes(term);
+                const docType = (typeof detectDocTypeFromName === 'function') ? detectDocTypeFromName(doc.name) : '';
+                const matchType = !typeFilter || docType === typeFilter;
+                const matchCust = !custFilter || (doc.appProperties?.customerName || '') === custFilter;
+                return matchTerm && matchType && matchCust;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-10 text-center text-gray-500">Không tìm thấy tài liệu nào.</td></tr>';
                 return;
             }
-            
-            filteredDocs.forEach(doc => {
-                const tr = document.createElement('tr');
-                tr.className = 'bg-white border-b hover:bg-gray-50';
-                
-                const date = new Date(doc.createdTime);
-                const formattedDate = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-                
-                const templateName = doc.appProperties && doc.appProperties.templateName ? doc.appProperties.templateName : 'Không xác định';
-                const customerName = doc.appProperties && doc.appProperties.customerName ? doc.appProperties.customerName : 'N/A';
-                const ownerName = doc.owners && doc.owners.length > 0 ? doc.owners[0].displayName : 'Không xác định';
-                
-                let iconSvg = '<svg class="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>';
-                const lowerName = doc.name.toLowerCase();
-                if (lowerName.endsWith('.docx') || lowerName.endsWith('.doc')) {
-                    iconSvg = '<svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm-2 16c-2.05 0-3.81-1.24-4.58-3h1.71c.63.9 1.68 1.5 2.87 1.5 1.93 0 3.5-1.57 3.5-3.5S13.93 9.5 12 9.5c-1.35 0-2.52.78-3.1 1.9l1.6 1.6h-4V9l1.3 1.3C8.69 8.92 10.23 8 12 8c2.76 0 5 2.24 5 5s-2.24 5-5 5z"/></svg>';
-                } else if (lowerName.endsWith('.pdf')) {
-                    iconSvg = '<svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></svg>';
-                } else if (lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls')) {
-                    iconSvg = '<svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm-2.8 15.6l-1.6-4.6h-1.7l-1.6 4.6H4.8l2.5-6.5L4.9 4.6h1.6l1.5 4.5h1.7l1.5-4.5h1.6l-2.4 6.5 2.5 6.5h-1.5z"/></svg>';
-                }
 
-                const _srcType = detectDocTypeFromName(doc.name);
-                const _chainOpts = CHAIN_OPTIONS[_srcType] || [];
-                const _chainHtml = `
-                    <div class="relative inline-block text-left" id="cm-${doc.id}">
+            filtered.forEach(doc => {
+                const tr = document.createElement('tr');
+                tr.className = 'bg-white border-b hover:bg-gray-50 transition-colors';
+
+                const date = new Date(doc.createdTime);
+                const fmtDate = `${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getFullYear()}`;
+                const fmtTime = `${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+
+                const templateName = doc.appProperties?.templateName || 'Không xác định';
+                const customerName = doc.appProperties?.customerName || 'N/A';
+                const docType     = (typeof detectDocTypeFromName === 'function') ? detectDocTypeFromName(doc.name) : '';
+                const typeBadge   = docType
+                    ? `<span class="px-2 py-0.5 rounded-full text-xs font-semibold ${TYPE_COLORS[docType] || 'bg-gray-100 text-gray-700'}">${TYPE_LABELS[docType] || docType}</span>`
+                    : '';
+
+                // File icon
+                const ext = doc.name.split('.').pop().toLowerCase();
+                const iconColor = ext === 'docx' ? 'text-blue-600' : ext === 'xlsx' ? 'text-green-600' : ext === 'pdf' ? 'text-red-600' : 'text-gray-500';
+                const iconSvg = `<svg class="w-4 h-4 ${iconColor} flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>`;
+
+                // Chain menu
+                const _chainOpts = (typeof CHAIN_OPTIONS !== 'undefined' && docType) ? (CHAIN_OPTIONS[docType] || []) : [];
+                const chainHtml = `
+                    <div class="relative inline-block" id="cm-${doc.id}">
                         <button onclick="toggleChainMenu('${doc.id}')"
-                                class="text-green-700 bg-green-50 hover:bg-green-100 text-xs font-medium px-2 py-1 rounded inline-flex items-center gap-1 border border-green-200 transition-all active:scale-95">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                            </svg>
+                                class="text-green-700 bg-green-50 hover:bg-green-100 text-xs font-medium px-2 py-1 rounded border border-green-200 inline-flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Tạo tiếp
                         </button>
                         <div id="cd-${doc.id}"
-                             class="hidden absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 min-w-[200px] py-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div class="px-3 py-1 mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tài liệu liên quan</div>
+                             class="hidden absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 min-w-[200px] py-2">
                             ${_chainOpts.map(opt => `
                                 <button onclick="createChainedDoc('${doc.id}','${doc.name}','${opt.type}')"
-                                        class="w-full text-left px-4 py-2 text-sm ${opt.colorClass} flex items-center gap-2 transition-colors">
-                                    <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                        class="w-full text-left px-4 py-2 text-sm ${opt.colorClass} flex items-center gap-2">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                     ${opt.label}
                                 </button>`).join('')}
                             ${_chainOpts.length > 0 ? '<div class="border-t border-gray-100 my-1"></div>' : ''}
-                            <button onclick="createChainedDoc('${doc.id}','${doc.name}', 'ANY')"
-                                    class="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2 transition-colors">
-                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V7M8 7h12m0 0v8a2 2 0 01-2 2h-6"></path></svg>
-                                Sử dụng cho mẫu khác...
+                            <button onclick="createChainedDoc('${doc.id}','${doc.name}','ANY')"
+                                    class="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2">
+                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                Mẫu khác...
                             </button>
                         </div>
                     </div>`;
 
                 tr.innerHTML = `
-                    <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                    <td class="px-4 py-3">
                         <div class="flex items-center gap-2">
                             ${iconSvg}
-                            ${doc.name}
+                            <span class="text-sm font-medium text-gray-900 max-w-[200px] truncate" title="${doc.name}">${doc.name}</span>
                         </div>
                     </td>
-                    <td class="px-6 py-4 text-gray-600">
-                        ${templateName}
+                    <td class="px-4 py-3">${typeBadge}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 max-w-[160px] truncate">${templateName}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700 font-medium">${customerName}</td>
+                    <td class="px-4 py-3">
+                        <div class="text-sm text-gray-800">${fmtDate}</div>
+                        <div class="text-xs text-gray-400">${fmtTime}</div>
                     </td>
-                    <td class="px-6 py-4 text-gray-600">
-                        ${customerName}
-                    </td>
-                    <td class="px-6 py-4 text-gray-600">
-                        ${ownerName}
-                    </td>
-                    <td class="px-6 py-4">
-                        ${formattedDate}
-                    </td>
-                    <td class="px-6 py-4 text-right space-x-2">
-                        ${_chainHtml}
-                        ${doc.webViewLink ? `<a href="${doc.webViewLink}" target="_blank" class="font-medium text-blue-600 hover:underline inline-flex items-center gap-1" title="Xem trước">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                        </a>` : ''}
-                        ${doc.webContentLink ? `<a href="${doc.webContentLink}" class="font-medium text-green-600 hover:underline inline-flex items-center gap-1" title="Tải xuống">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        </a>` : ''}
-                        <button onclick="copyDocumentEdit('${doc.id}', '${doc.name}', '${templateName}')" class="font-medium text-indigo-600 hover:text-indigo-900 inline-flex items-center gap-1" title="Copy và chỉnh sửa trước khi lưu">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        </button>
-                        <button onclick="deleteDocument('${doc.id}')" class="font-medium text-red-600 hover:underline inline-flex items-center gap-1" title="Xóa">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
+                        ${chainHtml}
+                        <a href="${doc.webViewLink}" target="_blank"
+                           class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50"
+                           title="Xem trên Drive">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            Xem
+                        </a>
+                        <a href="${doc.webContentLink}" download
+                           class="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
+                           title="Tải về">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Tải
+                        </a>
+                        <button onclick="deleteGeneratedDoc('${doc.id}', '${doc.name}')"
+                                class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:bg-red-50"
+                                title="Xóa">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            Xóa
                         </button>
                     </td>
                 `;
@@ -3947,9 +4049,31 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             });
         }
 
+        window.deleteGeneratedDoc = function(fileId, fileName) {
+            showConfirmModal(
+                'Xóa tài liệu',
+                `Xóa "${fileName}" khỏi Google Drive? Hành động này không thể hoàn tác.`,
+                async () => {
+                    try {
+                        await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+                            method: 'DELETE',
+                            headers: { Authorization: `Bearer ${accessToken}` }
+                        });
+                        generatedDocuments = generatedDocuments.filter(d => d.id !== fileId);
+                        renderDocumentList();
+                        showToast('Đã xóa tài liệu khỏi Drive');
+                    } catch(err) {
+                        showToast('Lỗi xóa tài liệu: ' + (err.message || ''), true);
+                    }
+                }
+            );
+        };
+
         document.getElementById('document-search').addEventListener('input', (e) => {
             renderDocumentList(e.target.value);
         });
+        document.getElementById('doc-type-filter')?.addEventListener('change', () => renderDocumentList(document.getElementById('document-search')?.value || ''));
+        document.getElementById('doc-customer-filter')?.addEventListener('change', () => renderDocumentList(document.getElementById('document-search')?.value || ''));
 
         document.getElementById('refresh-docs-btn').addEventListener('click', () => {
             loadGeneratedDocuments();
@@ -4320,9 +4444,29 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             if (appProperties) metadata.appProperties = appProperties;
             if (folderId && !fileId) metadata.parents = [folderId];
 
-            const form = new FormData();
-            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-            form.append('file', blob);
+            // Convert blob to Base64 (required for proper Google Drive API binary upload)
+            const base64Data = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+            
+            // Remove the "data:application/octet-stream;base64," prefix
+            const cleanBase64 = base64Data.split(',')[1];
+
+            const boundary = '-------314159265358979323846';
+            const delimiter = "\r\n--" + boundary + "\r\n";
+            const close_delim = "\r\n--" + boundary + "--";
+
+            const multipartRequestBody =
+                delimiter +
+                'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+                JSON.stringify(metadata) +
+                delimiter +
+                'Content-Type: ' + mimeType + '\r\n' +
+                'Content-Transfer-Encoding: base64\r\n\r\n' +
+                cleanBase64 +
+                close_delim;
 
             const url = fileId
                 ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart&fields=id,webViewLink`
@@ -4331,8 +4475,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
             const response = await fetch(url, {
                 method: method,
-                headers: { Authorization: `Bearer ${accessToken}` },
-                body: form,
+                headers: { 
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': `multipart/related; boundary=${boundary}`
+                },
+                body: multipartRequestBody
             });
 
             const data = await response.json();
