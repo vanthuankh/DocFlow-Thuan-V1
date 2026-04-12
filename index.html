@@ -67,7 +67,7 @@
                 </div>
                 
                 <!-- Main Navigation -->
-                <nav id="main-nav" class="hidden md:flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                <nav id="main-nav" class="flex flex-wrap items-center gap-1 bg-gray-100 p-1 rounded-lg">
                     <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition" data-view="customers-view">
                         Quản lý khách hàng
                     </button>
@@ -1428,36 +1428,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         }
 
         // --- NAVIGATION LOGIC ---
-        document.querySelectorAll('#main-nav button').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                // Update active state
-                document.querySelectorAll('#main-nav button').forEach(b => {
-                    b.classList.remove('bg-blue-700', 'text-white');
-                    b.classList.add('text-blue-100', 'hover:bg-blue-700');
-                });
-                e.currentTarget.classList.add('bg-blue-700', 'text-white');
-                e.currentTarget.classList.remove('text-blue-100', 'hover:bg-blue-700');
-
-                // Hide all views
-                document.querySelectorAll('.main-view').forEach(v => v.classList.add('hidden'));
-
-                // Show target view
-                const targetViewId = e.currentTarget.dataset.view;
-                if (targetViewId) {
-                    document.getElementById(targetViewId).classList.remove('hidden');
-                }
-                
-                // Special handling for specific views
-                if (targetViewId === 'customers-view') {
-                    renderCustomerList();
-                } else if (targetViewId === 'add-customer-view') {
-                    openAddCustomerTab();
-                } else if (targetViewId === 'documents-view') {
-                    loadGeneratedDocuments();
-                }
-            });
-        });
-
         function openCustomerModal() {
             document.getElementById('customer-modal').classList.remove('hidden');
         }
@@ -1709,13 +1679,15 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             currentView = viewId;
             if (viewId === 'documents-view') {
                 loadGeneratedDocuments();
+            } else if (viewId === 'customers-view') {
+                renderCustomerList();
             }
         }
 
         document.querySelectorAll('.main-nav-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const targetView = e.target.dataset.view;
-                if (targetView === currentView) return;
+                const targetView = e.currentTarget.dataset.view;
+                if (!targetView || targetView === currentView) return;
                 switchView(targetView);
             });
         });
@@ -2762,8 +2734,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 formData['DIA_CHI_CONG_TY'] = settings.companyAddress || '';
                 formData['MST_CONG_TY'] = settings.companyTax || '';
 
-                const finalData = computeFields(formData);
-
                 const docTypeCode = detectDocTypeFromName(currentTemplate.name);
                 const year = new Date().getFullYear();
 
@@ -2778,6 +2748,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 // Lưu docNumber vào formData để ghép vào template
                 formData['MA_TAI_LIEU'] = docNumber;
                 formData['SO_TAI_LIEU'] = docNumber;
+                
+                const finalData = computeFields(formData);
 
                 const _dlDocType = detectDocTypeFromFormData(formData, currentTemplate?.name || '');
                 const _dlExt = currentTemplate?.type === 'xlsx' ? 'xlsx' : 'docx';
@@ -4682,12 +4654,17 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             }
 
             const clientShort = getClientShort();
-            const docNum   = formData['MA_TAI_LIEU'] || formData['SO_TAI_LIEU'] || formData['MA_HOP_DONG'] || '';
-            const relatedBG = formData['SO_BAO_GIA']  || formData['MA_BAO_GIA'] || formData['SO_TAI_LIEU_GOC'] || '';
-            const relatedHD = formData['SO_HOP_DONG'] || formData['MA_HOP_DONG'] || formData['SO_TAI_LIEU_GOC'] || '';
+            let docNum   = formData['MA_TAI_LIEU'] || formData['SO_TAI_LIEU'] || formData['MA_HOP_DONG'] || '';
+            let relatedBG = formData['SO_BAO_GIA']  || formData['MA_BAO_GIA'] || formData['SO_TAI_LIEU_GOC'] || '';
+            let relatedHD = formData['SO_HOP_DONG'] || formData['MA_HOP_DONG'] || formData['SO_TAI_LIEU_GOC'] || '';
             const phienBan = formData['PHIEN_BAN'] || 'v1';
             const soPhuLuc = formData['SO_PHU_LUC'] || formData['MA_TAI_LIEU'] || '';
             const ext = extension || 'docx';
+
+            // Remove duplicate prefixes if they exist
+            if (docNum.startsWith(docTypeCode + '-')) docNum = docNum.substring(docTypeCode.length + 1);
+            if (relatedBG.startsWith('BG-')) relatedBG = relatedBG.substring(3);
+            if (relatedHD.startsWith('HD-')) relatedHD = relatedHD.substring(3);
 
             const names = {
                 BG:   `BG-${docNum}-${clientShort}-${dateStr}-${phienBan}.${ext}`,
@@ -4703,12 +4680,12 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         function detectDocTypeFromName(name) {
             const n = (name || '').toLowerCase();
-            if (n.startsWith('bg-') || n.includes('bao_gia') || n.includes('bao-gia') || n.includes('báo giá')) return 'BG';
-            if (n.startsWith('hd-') || n.includes('hop_dong') || n.includes('hop-dong') || n.includes('hợp đồng')) return 'HD';
-            if (n.startsWith('bbgh-') || n.includes('giao_hang') || n.includes('giao-hang') || n.includes('giao hàng')) return 'BBGH';
-            if (n.startsWith('bbnt-') || n.includes('nghiem_thu') || n.includes('nghiệm thu')) return 'BBNT';
-            if (n.startsWith('dntt-') || n.includes('thanh_toan') || n.includes('thanh-toan') || n.includes('thanh toán')) return 'DNTT';
-            if (n.includes('phu_luc') || n.includes('phu-luc') || n.includes('phụ lục')) return 'PL';
+            if (n.startsWith('bg-') || n.includes('bao_gia') || n.includes('bao-gia') || n.includes('báo giá') || n.includes('quote') || n.includes('quotation')) return 'BG';
+            if (n.startsWith('hd-') || n.includes('hop_dong') || n.includes('hop-dong') || n.includes('hợp đồng') || n.includes('contract')) return 'HD';
+            if (n.startsWith('bbgh-') || n.includes('giao_hang') || n.includes('giao-hang') || n.includes('giao hàng') || n.includes('delivery')) return 'BBGH';
+            if (n.startsWith('bbnt-') || n.includes('nghiem_thu') || n.includes('nghiệm thu') || n.includes('acceptance')) return 'BBNT';
+            if (n.startsWith('dntt-') || n.includes('thanh_toan') || n.includes('thanh-toan') || n.includes('thanh toán') || n.includes('payment')) return 'DNTT';
+            if (n.includes('phu_luc') || n.includes('phu-luc') || n.includes('phụ lục') || n.includes('appendix') || n.includes('annex')) return 'PL';
             return 'TL';
         }
 
