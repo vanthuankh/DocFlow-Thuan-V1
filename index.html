@@ -2266,17 +2266,16 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     </div>
                     <div class="border border-gray-200 border-t-0 rounded-b-xl overflow-hidden">
                         <div class="overflow-x-auto w-full">
-                            <table class="w-full text-sm min-w-[1000px]" id="table-hang-hoa">
+                            <table class="w-full text-sm min-w-[800px]" id="table-hang-hoa">
                                 <thead>
                                     <tr class="bg-gray-700 text-white">
-                                        <th class="px-2 py-2.5 text-center font-semibold w-10">STT</th>
-                                        <th class="px-3 py-2.5 text-left font-semibold min-w-[350px]">Tên hàng hóa / Dịch vụ</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold w-16">ĐVT</th>
-                                        <th class="px-2 py-2.5 text-right font-semibold w-24">Số lượng</th>
-                                        <th class="px-2 py-2.5 text-right font-semibold w-32">Đơn giá (VNĐ)</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold w-24">Thuế GTGT</th>
-                                        <th class="px-2 py-2.5 text-right font-semibold w-36 bg-blue-800">Thành tiền (VNĐ)</th>
-                                        <th class="px-2 py-2.5 text-left font-semibold w-28">Ghi chú</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold w-10 border-r border-gray-600">STT</th>
+                                        <th class="px-3 py-2.5 text-center font-semibold w-full border-r border-gray-600">Tên sản phẩm</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold w-24 border-r border-gray-600">Đơn vị tính</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold w-24 border-r border-gray-600">Số lượng</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold w-32 border-r border-gray-600">Đơn giá</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold w-24 border-r border-gray-600">Thuế</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold w-40 bg-blue-800">Thành tiền</th>
                                         <th class="w-8"></th>
                                     </tr>
                                 </thead>
@@ -2472,50 +2471,44 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             ).join('');
 
             tr.innerHTML = `
-                <td class="px-2 py-2 text-center text-gray-400 text-sm font-medium w-10"
+                <td class="px-2 py-2 text-center text-gray-400 text-sm font-medium w-10 border-r border-gray-100"
                     data-col="STT">${stt}</td>
-                <td class="px-2 py-1.5 min-w-[350px]">
+                <td class="px-2 py-1.5 w-full border-r border-gray-100">
                     <input type="text" data-col="TEN_HANG" value="${ten}"
-                           placeholder="Tên hàng hóa..."
-                           class="w-full min-w-[300px] text-sm border border-gray-300 rounded-md px-2 py-1.5
+                           placeholder="Tên sản phẩm..."
+                           class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none">
                 </td>
-                <td class="px-1.5 py-1.5 w-16">
+                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100">
                     <input type="text" data-col="DVT" value="${dvt}"
                            placeholder="cái"
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-center">
                 </td>
-                <td class="px-1.5 py-1.5 w-24">
+                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100">
                     <input type="number" data-col="NUM_SL" value="${sl}"
                            placeholder="0" min="0" step="any"
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right">
+                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger">
                 </td>
-                <td class="px-1.5 py-1.5 w-32">
+                <td class="px-1.5 py-1.5 w-32 border-r border-gray-100">
                     <input type="number" data-col="NUM_DON_GIA" value="${dg}"
                            placeholder="0" min="0" step="any"
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right">
+                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger">
                 </td>
-                <td class="px-1.5 py-1.5 w-24">
+                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100">
                     <select data-col="NUM_VAT"
                             class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none bg-white text-center">
+                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none bg-white text-center calc-trigger">
                         ${vatOpts}
                     </select>
                 </td>
-                <td class="px-1.5 py-1.5 w-36">
+                <td class="px-1.5 py-1.5 w-40 border-r border-gray-100">
                     <input type="text" data-col="NUM_THANH_TIEN" value="${tt}"
                            readonly placeholder="Tự tính"
                            class="w-full text-sm border border-gray-200 bg-blue-50 rounded-md px-2 py-1.5
                                   outline-none text-right font-semibold text-blue-700 cursor-default">
-                </td>
-                <td class="px-1.5 py-1.5 w-28">
-                    <input type="text" data-col="GHI_CHU" value="${ghichu}"
-                           placeholder="Ghi chú"
-                           class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none">
                 </td>
                 <td class="px-2 py-1.5 text-center w-8">
                     <button type="button" class="remove-hh-btn text-gray-300 hover:text-red-500 transition-colors"
@@ -2545,7 +2538,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             tr.querySelector('[data-col="NUM_SL"]').addEventListener('input', calcRow);
             tr.querySelector('[data-col="NUM_DON_GIA"]').addEventListener('input', calcRow);
             tr.querySelector('[data-col="NUM_VAT"]').addEventListener('change', calcRow);
-            tr.querySelectorAll('[data-col="TEN_HANG"],[data-col="DVT"],[data-col="GHI_CHU"]')
+            tr.querySelectorAll('[data-col="TEN_HANG"],[data-col="DVT"]')
               .forEach(el => el.addEventListener('input', syncHangHoaData));
 
             tr.querySelector('.remove-hh-btn').addEventListener('click', () => {
@@ -2575,8 +2568,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     NUM_SL:          tr.querySelector('[data-col="NUM_SL"]')?.value    || '0',
                     NUM_DON_GIA:     tr.querySelector('[data-col="NUM_DON_GIA"]')?.value || '0',
                     NUM_VAT:         tr.querySelector('[data-col="NUM_VAT"]')?.value   || '0',
-                    NUM_THANH_TIEN:  tr.querySelector('[data-col="NUM_THANH_TIEN"]')?.value || '0',
-                    GHI_CHU:         tr.querySelector('[data-col="GHI_CHU"]')?.value  || '',
+                    NUM_THANH_TIEN:  tr.querySelector('[data-col="NUM_THANH_TIEN"]')?.value || '0'
                 });
             });
             formData['TABLE_HANG_HOA'] = rows;
@@ -3364,8 +3356,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const statusFilter = document.getElementById('customer-status-filter').value;
 
             const filtered = customers.filter(c => {
-                const matchSearch = c.ten_cong_ty.toLowerCase().includes(searchTerm) || 
-                                    c.mst.includes(searchTerm) || 
+                const matchSearch = (c.ten_cong_ty || '').toLowerCase().includes(searchTerm) || 
+                                    (c.mst || '').includes(searchTerm) || 
                                     (c.sdt && c.sdt.includes(searchTerm)) ||
                                     (c.lien_he && c.lien_he.some(l => l.ten && l.ten.toLowerCase().includes(searchTerm)));
                 const matchStatus = statusFilter === '' || c.trang_thai === statusFilter;
@@ -3551,8 +3543,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             if (!query || query.length < 2) return [];
             const lowerQuery = query.toLowerCase();
             return customers.filter(c => 
-                c.ten_cong_ty.toLowerCase().includes(lowerQuery) || 
-                c.mst.includes(lowerQuery) || 
+                (c.ten_cong_ty || '').toLowerCase().includes(lowerQuery) || 
+                (c.mst || '').includes(lowerQuery) || 
                 (c.sdt && c.sdt.includes(lowerQuery)) ||
                 (c.lien_he && c.lien_he.some(l => l.ten && l.ten.toLowerCase().includes(lowerQuery)))
             ).slice(0, 5); // Limit to 5 results
