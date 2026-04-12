@@ -2244,7 +2244,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
             if (hasHangHoa) {
                 const tableDiv = document.createElement('div');
-                tableDiv.className = 'col-span-full mt-2';
+                tableDiv.className = 'col-span-full mt-2 min-w-0 w-full overflow-hidden';
                 tableDiv.id = 'hang-hoa-section';
                 tableDiv.innerHTML = `
                     <div class="bg-blue-600 px-4 py-2.5 rounded-t-xl flex justify-between items-center">
@@ -2265,7 +2265,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         </button>
                     </div>
                     <div class="border border-gray-200 border-t-0 rounded-b-xl overflow-hidden">
-                        <div class="overflow-x-auto w-full" style="max-width: 100vw;">
+                        <div class="overflow-x-auto w-full">
                             <table class="w-full text-sm min-w-[1000px]" id="table-hang-hoa">
                                 <thead>
                                     <tr class="bg-gray-700 text-white">
@@ -2307,15 +2307,15 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             for (const [tableName, cols] of Object.entries(templateTables)) {
                 if (tableName === 'TABLE_HANG_HOA' || tableName === 'HANG_HOA') continue; // Đã xử lý ở trên
                 const tableDiv = document.createElement('div');
-                tableDiv.className = 'col-span-full mt-4 border border-gray-200 rounded-lg overflow-hidden bg-white';
+                tableDiv.className = 'col-span-full mt-4 border border-gray-200 rounded-lg overflow-hidden bg-white min-w-0 w-full';
                 let ths = cols.map(c => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">${c}</th>`).join('');
                 tableDiv.innerHTML = `
                     <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                         <h3 class="text-sm font-semibold text-gray-700">${tableName}</h3>
                         <button type="button" class="add-row-btn text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200" data-table="${tableName}">+ Thêm dòng</button>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200" id="table-${tableName}">
+                    <div class="overflow-x-auto w-full">
+                        <table class="min-w-[800px] w-full divide-y divide-gray-200" id="table-${tableName}">
                             <thead class="bg-gray-50"><tr>${ths}<th class="px-4 py-2 w-10"></th></tr></thead>
                             <tbody class="bg-white divide-y divide-gray-200" id="tbody-${tableName}"></tbody>
                         </table>
@@ -2474,10 +2474,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             tr.innerHTML = `
                 <td class="px-2 py-2 text-center text-gray-400 text-sm font-medium w-10"
                     data-col="STT">${stt}</td>
-                <td class="px-2 py-1.5">
+                <td class="px-2 py-1.5 min-w-[350px]">
                     <input type="text" data-col="TEN_HANG" value="${ten}"
                            placeholder="Tên hàng hóa..."
-                           class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
+                           class="w-full min-w-[300px] text-sm border border-gray-300 rounded-md px-2 py-1.5
                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none">
                 </td>
                 <td class="px-1.5 py-1.5 w-16">
