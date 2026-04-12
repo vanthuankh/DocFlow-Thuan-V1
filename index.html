@@ -272,6 +272,12 @@
 
                     <div class="mt-auto flex flex-col gap-3 pt-4 border-t border-gray-100">
                         <div class="flex gap-3">
+                            <button id="clear-session-btn" class="flex-1 bg-gray-100 text-gray-700 px-3 py-3 rounded-lg shadow-sm hover:bg-gray-200 transition font-medium flex justify-center items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                Tạo mới
+                            </button>
+                        </div>
+                        <div class="flex gap-3">
                             <button id="generate-docx-btn" class="flex-1 bg-blue-600 text-white px-3 py-3 rounded-lg shadow-sm hover:bg-blue-700 transition font-medium flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                 Tải DOCX
@@ -996,6 +1002,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         let driveRootFolderId    = null;   // ID folder "DocFlow"
         let driveTemplateFolderId = null;  // ID folder "_template"
         let driveSchemafolderId   = null;  // ID folder "_schemas"
+        let driveCustomerFolderId = null;  // ID folder "Khach_hang"
         const driveDocFolderIds   = {};    // { 'BG': id, 'HD': id, ... }
 
         // Map loại TL → tên folder và từ khóa nhận dạng
@@ -1312,6 +1319,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 // Gán vào biến
                 driveTemplateFolderId = existingFolders['_template'];
                 driveSchemafolderId   = existingFolders['_schemas'];
+                driveCustomerFolderId = existingFolders['Khach_hang'];
                 Object.entries(DOC_FOLDER_MAP).forEach(([code, folderName]) => {
                     driveDocFolderIds[code] = existingFolders[folderName];
                 });
@@ -1321,6 +1329,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     root:      driveRootFolderId,
                     templates: driveTemplateFolderId,
                     schemas:   driveSchemafolderId,
+                    customers: driveCustomerFolderId,
                     docs:      driveDocFolderIds,
                     cachedAt:  Date.now(),
                 }));
@@ -1342,6 +1351,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 driveRootFolderId     = data.root;
                 driveTemplateFolderId = data.templates;
                 driveSchemafolderId   = data.schemas;
+                driveCustomerFolderId = data.customers;
                 Object.assign(driveDocFolderIds, data.docs || {});
                 return true;
             } catch(e) { return false; }
@@ -1594,6 +1604,22 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         document.getElementById('generate-docx-btn').addEventListener('click', () => generateDocument('docx'));
         document.getElementById('generate-pdf-btn').addEventListener('click', () => generateDocument('pdf'));
         document.getElementById('clear-template-btn').addEventListener('click', clearSelectedTemplate);
+        document.getElementById('clear-session-btn').addEventListener('click', () => {
+            showConfirmModal('Tạo mới', 'Bạn có chắc chắn muốn xóa dữ liệu hiện tại để tạo mới?', () => {
+                formData = {};
+                selectedCustomer = null;
+                selectedContact = null;
+                pendingChainedData = null;
+                document.getElementById('dynamic-form').innerHTML = `
+                    <div class="col-span-full flex flex-col items-center justify-center text-gray-400 py-10">
+                        <svg class="w-12 h-12 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <p class="text-sm">Vui lòng chọn một biểu mẫu bên trái để bắt đầu.</p>
+                    </div>
+                `;
+                clearSelectedTemplate();
+                showToast('Đã xóa dữ liệu phiên làm việc hiện tại');
+            });
+        });
         
         // Settings Modal Listeners
         document.getElementById('settings-btn').addEventListener('click', () => {
@@ -3210,26 +3236,60 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 return;
             }
 
-            // Chưa có Google Sheet ID: dùng cache localStorage
-            if (!SHEET_ID) {
-                showToast("Vui lòng cấu hình Google Sheet ID trong phần Cài đặt để đồng bộ.", true);
-                document.getElementById('settings-modal').classList.remove('hidden');
-                loadSettings();
-                
-                // Switch to API tab
-                document.querySelectorAll('.settings-tab-btn').forEach(b => {
-                    b.classList.remove('active', 'bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-100');
-                    b.classList.add('text-gray-500', 'hover:bg-gray-200');
-                });
-                document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.add('hidden'));
-                
-                const apiTabBtn = document.querySelector('[data-tab="api-settings"]');
-                if (apiTabBtn) {
-                    apiTabBtn.classList.remove('text-gray-500', 'hover:bg-gray-200');
-                    apiTabBtn.classList.add('active', 'bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-100');
+            // Chưa có Google Sheet ID: tìm trong folder Khach_hang hoặc tạo mới
+            if (!SHEET_ID && gapiInited && accessToken && driveCustomerFolderId) {
+                try {
+                    // Tìm file spreadsheet trong folder Khach_hang
+                    const response = await gapi.client.drive.files.list({
+                        q: `'${driveCustomerFolderId}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
+                        fields: 'files(id, name)',
+                        spaces: 'drive',
+                        pageSize: 1
+                    });
+                    
+                    if (response.result.files && response.result.files.length > 0) {
+                        SHEET_ID = response.result.files[0].id;
+                        localStorage.setItem('docflow_sheet_id', SHEET_ID);
+                        document.getElementById('sheet-id-input').value = SHEET_ID;
+                        showToast("Đã tìm thấy file danh sách khách hàng.");
+                    } else {
+                        // Tạo file mới
+                        const createRes = await gapi.client.sheets.spreadsheets.create({
+                            resource: {
+                                properties: { title: 'Danh_sach_khach_hang' },
+                                sheets: [{ properties: { title: 'Sheet1' } }]
+                            }
+                        });
+                        SHEET_ID = createRes.result.spreadsheetId;
+                        
+                        // Move to Khach_hang folder
+                        await gapi.client.drive.files.update({
+                            fileId: SHEET_ID,
+                            addParents: driveCustomerFolderId,
+                            removeParents: 'root',
+                            fields: 'id, parents'
+                        });
+                        
+                        localStorage.setItem('docflow_sheet_id', SHEET_ID);
+                        document.getElementById('sheet-id-input').value = SHEET_ID;
+                        
+                        // Khởi tạo header
+                        await gapi.client.sheets.spreadsheets.values.update({
+                            spreadsheetId: SHEET_ID,
+                            range: 'Sheet1!A1:I1',
+                            valueInputOption: 'USER_ENTERED',
+                            resource: {
+                                values: [['ID', 'Tên công ty', 'Tên viết tắt', 'MST', 'Địa chỉ', 'SĐT', 'Email', 'Người đại diện', 'Chức vụ']]
+                            }
+                        });
+                        showToast("Đã tạo file danh sách khách hàng mới.");
+                    }
+                } catch (err) {
+                    console.error("Lỗi khi tìm/tạo file khách hàng:", err);
                 }
-                document.getElementById('tab-api-settings').classList.remove('hidden');
+            }
 
+            if (!SHEET_ID) {
                 const cached = localStorage.getItem('docflow_customers');
                 if (cached) {
                     try {
