@@ -190,6 +190,7 @@
                                     <li><code class="bg-gray-100 px-1 rounded text-green-600">{{TIEN_BANG_CHU}}</code> → Số tiền bằng chữ</li>
                                     <li><code class="bg-gray-100 px-1 rounded text-green-600">{{NGAY_THANG_NAM}}</code> → Ngày hiện tại</li>
                                     <li><code class="bg-gray-100 px-1 rounded text-green-600">{{MA_TAI_LIEU}}</code> → Số tài liệu tự sinh</li>
+                                    <li><code class="bg-gray-100 px-1 rounded text-green-600">{{DOT_1_SO_TIEN}}</code>, <code class="bg-gray-100 px-1 rounded text-green-600">{{DOT_1_BANG_CHU}}</code> → Số tiền đợt 1 (tương tự cho đợt 2, 3...)</li>
                                 </ul>
                             </div>
                         </div>
@@ -2170,8 +2171,18 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 return;
             }
 
+            const paymentVars = [
+                'DOT_1_TY_LE', 'DOT_1_SO_TIEN', 'DOT_1_BANG_CHU',
+                'DOT_2_TY_LE', 'DOT_2_SO_TIEN', 'DOT_2_BANG_CHU',
+                'DOT_3_TY_LE', 'DOT_3_SO_TIEN', 'DOT_3_BANG_CHU',
+                'DOT_4_TY_LE', 'DOT_4_SO_TIEN', 'DOT_4_BANG_CHU',
+                'DOT_5_TY_LE', 'DOT_5_SO_TIEN', 'DOT_5_BANG_CHU'
+            ];
+            const normalVars = templateVariables.filter(v => !paymentVars.includes(v.trim()));
+            const hasPaymentVars = templateVariables.some(v => paymentVars.includes(v.trim()));
+
             // Render normal variables
-            templateVariables.forEach(v => {
+            normalVars.forEach(v => {
                 const cleanV = v.trim(); // Trim space đầu/cuối
                 if (cleanV !== v) {
                     // Biến có space → dùng tên đã trim, lưu mapping
@@ -2237,6 +2248,111 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 formContainer.appendChild(div);
             });
 
+            // Render Payment Terms Section if needed
+            if (hasPaymentVars) {
+                const paymentDiv = document.createElement('div');
+                paymentDiv.className = 'col-span-full mt-4 border border-blue-200 rounded-lg overflow-hidden bg-white min-w-0 w-full';
+                paymentDiv.id = 'payment-terms-section';
+                
+                // Determine max dots based on variables present
+                let maxDots = 1;
+                for (let i = 5; i >= 1; i--) {
+                    if (templateVariables.some(v => v.trim().startsWith(`DOT_${i}_`))) {
+                        maxDots = i;
+                        break;
+                    }
+                }
+
+                paymentDiv.innerHTML = `
+                    <div class="bg-blue-50 px-4 py-3 border-b border-blue-200 flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-blue-800 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Điều khoản thanh toán
+                        </h3>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs font-medium text-blue-700">Số đợt:</label>
+                            <select id="payment-installments-select" class="text-sm border border-blue-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 outline-none">
+                                ${[1,2,3,4,5].slice(0, maxDots).map(i => `<option value="${i}">${i} đợt</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div id="payment-installments-container" class="p-4 space-y-3">
+                        <!-- Installments will be generated here -->
+                    </div>
+                `;
+                formContainer.appendChild(paymentDiv);
+
+                const selectEl = paymentDiv.querySelector('#payment-installments-select');
+                const containerEl = paymentDiv.querySelector('#payment-installments-container');
+
+                const renderInstallments = () => {
+                    const num = parseInt(selectEl.value) || 1;
+                    let html = '';
+                    for (let i = 1; i <= num; i++) {
+                        let tyLe = formData[`DOT_${i}_TY_LE`];
+                        if (!tyLe && num === 1) {
+                            tyLe = '100';
+                            formData[`DOT_${i}_TY_LE`] = tyLe;
+                        } else if (!tyLe) {
+                            tyLe = '';
+                        }
+                        
+                        html += `
+                            <div class="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <div class="font-medium text-sm text-gray-700 w-16">Đợt ${i}:</div>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="dot_${i}_tyle" value="${tyLe}" placeholder="0" class="w-20 text-sm border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-blue-400 outline-none text-right payment-tyle-input" data-dot="${i}">
+                                    <span class="text-sm text-gray-500">%</span>
+                                </div>
+                                <div class="flex-1 flex items-center gap-2 justify-end">
+                                    <span class="text-sm text-gray-500">Số tiền:</span>
+                                    <input type="text" id="dot_${i}_sotien" readonly class="w-32 text-sm border border-gray-200 bg-gray-100 rounded px-2 py-1.5 text-right font-semibold text-gray-700 cursor-default">
+                                    <span class="text-sm text-gray-500">VNĐ</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    containerEl.innerHTML = html;
+
+                    // Add event listeners
+                    containerEl.querySelectorAll('.payment-tyle-input').forEach(input => {
+                        input.addEventListener('input', (e) => {
+                            const dot = e.target.dataset.dot;
+                            formData[`DOT_${dot}_TY_LE`] = e.target.value;
+                            updatePaymentAmounts();
+                        });
+                    });
+                    
+                    updatePaymentAmounts();
+                };
+
+                selectEl.addEventListener('change', () => {
+                    // Reset variables for hidden dots
+                    const num = parseInt(selectEl.value) || 1;
+                    if (num === 1) {
+                        formData['DOT_1_TY_LE'] = '100';
+                    }
+                    for (let i = num + 1; i <= 5; i++) {
+                        formData[`DOT_${i}_TY_LE`] = '';
+                        formData[`DOT_${i}_SO_TIEN`] = '';
+                        formData[`DOT_${i}_BANG_CHU`] = '';
+                    }
+                    renderInstallments();
+                });
+
+                // Initial render
+                // Try to guess initial selected installments from formData
+                let initialDots = 1;
+                for (let i = maxDots; i >= 1; i--) {
+                    if (formData[`DOT_${i}_TY_LE`]) {
+                        initialDots = i;
+                        break;
+                    }
+                }
+                selectEl.value = initialDots;
+                renderInstallments();
+            }
+
             // Render tables
             const COL_LABELS = {
                 STT:'STT', TEN_HANG:'Tên hàng hóa / Dịch vụ',
@@ -2280,11 +2396,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                                 <thead>
                                     <tr class="bg-gray-700 text-white">
                                         <th class="px-3 py-2.5 text-center font-semibold w-full border-r border-gray-600">Tên sản phẩm</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold w-24 border-r border-gray-600">Đơn vị tính</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold w-24 border-r border-gray-600">Số lượng</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold w-28 border-r border-gray-600">Đơn giá</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold w-24 border-r border-gray-600">Thuế</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold w-32 bg-blue-800">Thành tiền</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 80px;">Đơn vị tính</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 80px;">Số lượng</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 140px;">Đơn giá</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 70px;">Thuế</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold bg-blue-800" style="width: 160px;">Thành tiền</th>
                                         <th class="w-8"></th>
                                     </tr>
                                 </thead>
@@ -2484,32 +2600,32 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none resize-none overflow-y-auto">${ten}</textarea>
                 </td>
-                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100 align-top">
+                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 80px; min-width: 80px;">
                     <input type="text" data-col="DVT" value="${dvt}"
                            placeholder="cái"
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-center">
                 </td>
-                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100 align-top">
+                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 80px; min-width: 80px;">
                     <input type="number" data-col="NUM_SL" value="${sl}"
                            placeholder="0" min="0" step="any"
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger hide-spin-button">
                 </td>
-                <td class="px-1.5 py-1.5 w-28 border-r border-gray-100 align-top">
+                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 140px; min-width: 140px;">
                     <input type="number" data-col="NUM_DON_GIA" value="${dg}"
                            placeholder="0" min="0" step="any"
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger hide-spin-button">
                 </td>
-                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100 align-top">
+                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 70px; min-width: 70px;">
                     <select data-col="NUM_VAT"
-                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
+                            class="w-full text-sm border border-gray-300 rounded-md px-1 py-1.5
                                    focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none bg-white text-center calc-trigger">
                         ${vatOpts}
                     </select>
                 </td>
-                <td class="px-1.5 py-1.5 w-32 border-r border-gray-100 align-top">
+                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 160px; min-width: 160px;">
                     <input type="text" data-col="NUM_THANH_TIEN" value="${tt}"
                            readonly placeholder="Tự tính"
                            class="w-full text-sm border border-gray-200 bg-blue-50 rounded-md px-2 py-1.5
@@ -4998,6 +5114,30 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             return tblXml;
         }
 
+        function updatePaymentAmounts() {
+            const tongTTStr = formData['TONG_THANH_TOAN'] || '0';
+            const tongTT = parseFloat(tongTTStr.replace(/\./g, '')) || 0;
+            const fmt = n => Math.round(n).toLocaleString('vi-VN');
+
+            for (let i = 1; i <= 5; i++) {
+                const tyLeStr = formData[`DOT_${i}_TY_LE`];
+                if (tyLeStr) {
+                    const tyLe = parseFloat(tyLeStr) || 0;
+                    const soTien = tongTT * tyLe / 100;
+                    formData[`DOT_${i}_SO_TIEN`] = fmt(soTien);
+                    if (typeof numberToVietnameseWords === 'function') {
+                        formData[`DOT_${i}_BANG_CHU`] = numberToVietnameseWords(Math.round(soTien));
+                    }
+                    
+                    // Update UI if present
+                    const inputEl = document.getElementById(`dot_${i}_sotien`);
+                    if (inputEl) {
+                        inputEl.value = fmt(soTien);
+                    }
+                }
+            }
+        }
+
         function updateTotals() {
             const computed = computeFields(formData);
 
@@ -5007,6 +5147,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 if (el) el.value = computed[f] || '';
                 formData[f] = computed[f] || '';
             });
+
+            updatePaymentAmounts();
 
             // Hiển thị tóm tắt dưới bảng hàng hóa
             const totalsDiv = document.getElementById('totals-hang-hoa')
