@@ -22,6 +22,16 @@
         body { font-family: 'Be Vietnam Pro', sans-serif; background-color: #f3f4f6; }
         .hidden { display: none !important; }
         
+        /* Hide spin buttons for number inputs */
+        .hide-spin-button::-webkit-outer-spin-button,
+        .hide-spin-button::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .hide-spin-button[type=number] {
+            -moz-appearance: textfield;
+        }
+
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
@@ -2269,13 +2279,12 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                             <table class="w-full text-sm min-w-[800px]" id="table-hang-hoa">
                                 <thead>
                                     <tr class="bg-gray-700 text-white">
-                                        <th class="px-2 py-2.5 text-center font-semibold w-10 border-r border-gray-600">STT</th>
                                         <th class="px-3 py-2.5 text-center font-semibold w-full border-r border-gray-600">Tên sản phẩm</th>
                                         <th class="px-2 py-2.5 text-center font-semibold w-24 border-r border-gray-600">Đơn vị tính</th>
                                         <th class="px-2 py-2.5 text-center font-semibold w-24 border-r border-gray-600">Số lượng</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold w-32 border-r border-gray-600">Đơn giá</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold w-28 border-r border-gray-600">Đơn giá</th>
                                         <th class="px-2 py-2.5 text-center font-semibold w-24 border-r border-gray-600">Thuế</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold w-40 bg-blue-800">Thành tiền</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold w-32 bg-blue-800">Thành tiền</th>
                                         <th class="w-8"></th>
                                     </tr>
                                 </thead>
@@ -2457,7 +2466,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             tr.className = 'hover:bg-blue-50 transition-colors';
 
             // Giá trị mặc định
-            const stt     = rowData.STT          || String(idx);
             const ten     = rowData.TEN_HANG     || '';
             const dvt     = rowData.DVT          || '';
             const sl      = rowData.NUM_SL       || '';
@@ -2471,47 +2479,44 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             ).join('');
 
             tr.innerHTML = `
-                <td class="px-2 py-2 text-center text-gray-400 text-sm font-medium w-10 border-r border-gray-100"
-                    data-col="STT">${stt}</td>
-                <td class="px-2 py-1.5 w-full border-r border-gray-100">
-                    <input type="text" data-col="TEN_HANG" value="${ten}"
-                           placeholder="Tên sản phẩm..."
+                <td class="px-2 py-1.5 w-full border-r border-gray-100 align-top">
+                    <textarea data-col="TEN_HANG" rows="3" placeholder="Tên sản phẩm..."
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none">
+                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none resize-none overflow-y-auto">${ten}</textarea>
                 </td>
-                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100">
+                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100 align-top">
                     <input type="text" data-col="DVT" value="${dvt}"
                            placeholder="cái"
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-center">
                 </td>
-                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100">
+                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100 align-top">
                     <input type="number" data-col="NUM_SL" value="${sl}"
                            placeholder="0" min="0" step="any"
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger">
+                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger hide-spin-button">
                 </td>
-                <td class="px-1.5 py-1.5 w-32 border-r border-gray-100">
+                <td class="px-1.5 py-1.5 w-28 border-r border-gray-100 align-top">
                     <input type="number" data-col="NUM_DON_GIA" value="${dg}"
                            placeholder="0" min="0" step="any"
                            class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger">
+                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger hide-spin-button">
                 </td>
-                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100">
+                <td class="px-1.5 py-1.5 w-24 border-r border-gray-100 align-top">
                     <select data-col="NUM_VAT"
                             class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
                                    focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none bg-white text-center calc-trigger">
                         ${vatOpts}
                     </select>
                 </td>
-                <td class="px-1.5 py-1.5 w-40 border-r border-gray-100">
+                <td class="px-1.5 py-1.5 w-32 border-r border-gray-100 align-top">
                     <input type="text" data-col="NUM_THANH_TIEN" value="${tt}"
                            readonly placeholder="Tự tính"
                            class="w-full text-sm border border-gray-200 bg-blue-50 rounded-md px-2 py-1.5
                                   outline-none text-right font-semibold text-blue-700 cursor-default">
                 </td>
-                <td class="px-2 py-1.5 text-center w-8">
-                    <button type="button" class="remove-hh-btn text-gray-300 hover:text-red-500 transition-colors"
+                <td class="px-2 py-1.5 text-center w-8 align-top">
+                    <button type="button" class="remove-hh-btn text-gray-300 hover:text-red-500 transition-colors mt-1"
                             title="Xóa dòng">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -2543,11 +2548,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
             tr.querySelector('.remove-hh-btn').addEventListener('click', () => {
                 tr.remove();
-                // Cập nhật lại STT
-                tbody.querySelectorAll('tr').forEach((r, i) => {
-                    const sttEl = r.querySelector('[data-col="STT"]');
-                    if (sttEl) sttEl.textContent = i + 1;
-                });
                 syncHangHoaData();
                 updateHangHoaTotals();
             });
@@ -2729,17 +2729,22 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const docTypeCode = detectDocTypeFromName(currentTemplate.name);
                 const year = new Date().getFullYear();
 
-                // Lấy số thứ tự từ localStorage, tăng dần theo loại TL
-                const seqKey = `docflow_seq_${docTypeCode}_${year}`;
-                let seq = parseInt(localStorage.getItem(seqKey) || '0') + 1;
-                localStorage.setItem(seqKey, seq.toString());
-                const seqStr = seq.toString().padStart(3, '0');
+                let docNumber = formData['MA_TAI_LIEU'];
+                
+                // Chỉ tạo số mới nếu chưa có
+                if (!docNumber) {
+                    // Lấy số thứ tự từ localStorage, tăng dần theo loại TL
+                    const seqKey = `docflow_seq_${docTypeCode}_${year}`;
+                    let seq = parseInt(localStorage.getItem(seqKey) || '0') + 1;
+                    localStorage.setItem(seqKey, seq.toString());
+                    const seqStr = seq.toString().padStart(3, '0');
 
-                const docNumber = `${docTypeCode}-${year}-${seqStr}`;
+                    docNumber = `${docTypeCode}-${year}-${seqStr}`;
 
-                // Lưu docNumber vào formData để ghép vào template
-                formData['MA_TAI_LIEU'] = docNumber;
-                formData['SO_TAI_LIEU'] = docNumber;
+                    // Lưu docNumber vào formData để ghép vào template
+                    formData['MA_TAI_LIEU'] = docNumber;
+                    formData['SO_TAI_LIEU'] = docNumber;
+                }
                 
                 const finalData = computeFields(formData);
 
@@ -3100,7 +3105,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         appProperties: {
                             templateName: currentTemplate.name,
                             customerName: selectedCustomer ? selectedCustomer.ten_cong_ty : 'N/A',
-                            formDataKey: _fdKey
+                            formDataKey: _fdKey,
+                            docNumber: formData['MA_TAI_LIEU'] || ''
                         },
                         owners: [{ displayName: 'Bạn (Local)' }],
                         isLocal: true
@@ -3445,16 +3451,15 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                                 Tạo tài liệu
                             </button>
                             <div id="newdoc-menu-${c.id}"
-                                 class="hidden absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-30 min-w-[220px] py-2">
-                                <div class="px-3 py-1 mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tạo tài liệu mới cho ${c.ten_cong_ty}</div>
+                                 class="hidden absolute right-0 top-full mt-1 bg-blue-600 border border-blue-700 rounded-lg shadow-xl z-30 flex flex-row overflow-hidden">
                                 ${[
-                                    { code: 'BG',   label: '📄 Tạo Báo Giá',              color: 'text-blue-700 hover:bg-blue-50' },
-                                    { code: 'HD',   label: '📝 Tạo Hợp Đồng',             color: 'text-purple-700 hover:bg-purple-50' },
-                                    { code: 'BBGH', label: '📦 Tạo Biên Bản Giao Hàng',   color: 'text-amber-700 hover:bg-amber-50' },
-                                    { code: 'DNTT', label: '💰 Tạo Đề Nghị Thanh Toán',   color: 'text-teal-700 hover:bg-teal-50' },
+                                    { code: 'BG',   label: '📄 Báo Giá',              color: 'text-white hover:bg-blue-700' },
+                                    { code: 'HD',   label: '📝 Hợp Đồng',             color: 'text-white hover:bg-blue-700' },
+                                    { code: 'BBGH', label: '📦 BB Giao Hàng',         color: 'text-white hover:bg-blue-700' },
+                                    { code: 'DNTT', label: '💰 ĐN Thanh Toán',        color: 'text-white hover:bg-blue-700' },
                                 ].map(dt => `
                                     <button onclick="createDocForCustomer('${c.id}', '${dt.code}')"
-                                            class="w-full text-left px-4 py-2.5 text-sm ${dt.color} flex items-center gap-2 transition-colors">
+                                            class="px-3 py-2 text-xs font-medium ${dt.color} flex items-center gap-1.5 transition-colors whitespace-nowrap border-r border-blue-500 last:border-r-0">
                                         ${dt.label}
                                     </button>`).join('')}
                             </div>
@@ -4006,7 +4011,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             
             const localDocs = JSON.parse(localStorage.getItem('docflow_local_documents') || '[]');
             
-            generatedDocuments = [...localDocs, ...driveDocs].sort((a, b) => new Date(b.createdTime) - new Date(a.createdTime));
+            // Deduplicate by name, preferring Drive docs
+            const driveDocNames = new Set(driveDocs.map(d => d.name));
+            const filteredLocalDocs = localDocs.filter(d => !driveDocNames.has(d.name));
+            
+            generatedDocuments = [...filteredLocalDocs, ...driveDocs].sort((a, b) => new Date(b.createdTime) - new Date(a.createdTime));
             renderDocumentList();
         }
 
