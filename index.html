@@ -82,33 +82,33 @@
                         Quản lý khách hàng
                     </button>
                     
-                    <div class="relative group">
-                        <button class="main-nav-btn active px-4 py-2 rounded-md text-sm font-medium bg-white text-blue-700 shadow-sm transition flex items-center gap-1" data-view="editor-view">
+                    <div class="relative group" id="nav-dropdown-templates">
+                        <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 shadow-sm transition flex items-center gap-1" data-view="editor-view" onclick="document.getElementById('nav-menu-templates').classList.toggle('hidden')">
                             Mẫu tài liệu
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            <svg class="w-4 h-4 ml-1 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
-                        <div class="absolute left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates(''); return false;">Tất cả mẫu</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('BG'); return false;">Báo giá</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('HD'); return false;">Hợp đồng</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('BBBG'); return false;">Biên bản bàn giao</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('DNTT'); return false;">Đề nghị thanh toán</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('PL'); return false;">Phụ lục hợp đồng</a>
+                        <div id="nav-menu-templates" class="hidden absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg transition-all z-50">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100" onclick="filterTemplates(''); document.getElementById('nav-menu-templates').classList.add('hidden'); return false;">Tất cả mẫu</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('BG'); document.getElementById('nav-menu-templates').classList.add('hidden'); return false;">Báo giá</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('HD'); document.getElementById('nav-menu-templates').classList.add('hidden'); return false;">Hợp đồng</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('BBBG'); document.getElementById('nav-menu-templates').classList.add('hidden'); return false;">Biên bản bàn giao</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('DNTT'); document.getElementById('nav-menu-templates').classList.add('hidden'); return false;">Đề nghị thanh toán</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('PL'); document.getElementById('nav-menu-templates').classList.add('hidden'); return false;">Phụ lục hợp đồng</a>
                         </div>
                     </div>
 
-                    <div class="relative group">
-                        <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition flex items-center gap-1" data-view="documents-view">
+                    <div class="relative group" id="nav-dropdown-docs">
+                        <button class="main-nav-btn px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition flex items-center gap-1" data-view="documents-view" onclick="document.getElementById('nav-menu-docs').classList.toggle('hidden')">
                             Quản lý tài liệu
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            <svg class="w-4 h-4 ml-1 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
-                        <div class="absolute left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments(''); return false;">Tất cả tài liệu</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('BG'); return false;">Báo giá</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('HD'); return false;">Hợp đồng</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('BBBG'); return false;">Biên bản bàn giao</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('DNTT'); return false;">Đề nghị thanh toán</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('PL'); return false;">Phụ lục hợp đồng</a>
+                        <div id="nav-menu-docs" class="hidden absolute left-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg transition-all z-50">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100" onclick="filterDocuments(''); document.getElementById('nav-menu-docs').classList.add('hidden'); return false;">Tất cả tài liệu</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('BG'); document.getElementById('nav-menu-docs').classList.add('hidden'); return false;">Báo giá</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('HD'); document.getElementById('nav-menu-docs').classList.add('hidden'); return false;">Hợp đồng</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('BBBG'); document.getElementById('nav-menu-docs').classList.add('hidden'); return false;">Biên bản bàn giao</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('DNTT'); document.getElementById('nav-menu-docs').classList.add('hidden'); return false;">Đề nghị thanh toán</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('PL'); document.getElementById('nav-menu-docs').classList.add('hidden'); return false;">Phụ lục hợp đồng</a>
                         </div>
                     </div>
                 </nav>
@@ -1337,28 +1337,33 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         }
 
         async function ensureDriveFolders() {
-            if (driveRootFolderId) return; // Đã khởi tạo rồi
+            // Không return sớm nếu thiếu templatesSub để đảm bảo tạo đủ folder
+            if (driveRootFolderId && Object.keys(driveTemplateSubfolderIds).length > 0) return;
 
             try {
                 // --- Tạo/tìm folder gốc "DocFlow" ---
-                const rootRes = await gapi.client.drive.files.list({
-                    q: "name='DocFlow' and mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents",
-                    fields: 'files(id,name)',
-                    spaces: 'drive',
-                });
-
-                if (rootRes.result.files && rootRes.result.files.length > 0) {
-                    driveRootFolderId = rootRes.result.files[0].id;
-                } else {
-                    // Tạo mới
-                    const createRes = await gapi.client.drive.files.create({
-                        resource: {
-                            name: 'DocFlow',
-                            mimeType: 'application/vnd.google-apps.folder',
-                        },
-                        fields: 'id',
+                let localRootId = driveRootFolderId;
+                if (!localRootId) {
+                    const rootRes = await gapi.client.drive.files.list({
+                        q: "name='DocFlow' and mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents",
+                        fields: 'files(id,name)',
+                        spaces: 'drive',
                     });
-                    driveRootFolderId = createRes.result.id;
+
+                    if (rootRes.result.files && rootRes.result.files.length > 0) {
+                        localRootId = rootRes.result.files[0].id;
+                    } else {
+                        // Tạo mới
+                        const createRes = await gapi.client.drive.files.create({
+                            resource: {
+                                name: 'DocFlow',
+                                mimeType: 'application/vnd.google-apps.folder',
+                            },
+                            fields: 'id',
+                        });
+                        localRootId = createRes.result.id;
+                    }
+                    driveRootFolderId = localRootId;
                 }
 
                 // --- Tạo/tìm tất cả subfolder ---
@@ -1452,6 +1457,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const data = JSON.parse(cached);
                 // Cache hết hạn sau 24 giờ
                 if (Date.now() - data.cachedAt > 86400000) return false;
+                
+                // Bắt buộc invalidate nếu chưa có templatesSub
+                if (!data.templatesSub || Object.keys(data.templatesSub).length === 0) return false;
+
                 driveRootFolderId     = data.root;
                 driveTemplateFolderId = data.templates;
                 driveTemplateSubfolderIds = data.templatesSub || {};
@@ -1754,15 +1763,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         let currentView = 'editor-view';
 
         function switchView(viewId) {
-            if (viewId === 'editor-view') {
-                // If called from the main nav button (not a dropdown item), clear filter
-                try {
-                    if (window.event && !window.event.target?.closest('.absolute')) {
-                        currentTemplateFilter = '';
-                        renderTemplateList();
-                    }
-                } catch(e) {}
-            }
             document.querySelectorAll('.main-view').forEach(v => {
                 v.classList.add('hidden');
                 v.style.display = 'none';
@@ -1788,6 +1788,21 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 renderCustomerList();
             }
         }
+
+        // Global click listener for dropdowns
+        document.addEventListener('click', function(event) {
+            const isClickInsideTemplates = event.target.closest('#nav-dropdown-templates');
+            const navMenuTemplates = document.getElementById('nav-menu-templates');
+            if (!isClickInsideTemplates && navMenuTemplates && !navMenuTemplates.classList.contains('hidden')) {
+                navMenuTemplates.classList.add('hidden');
+            }
+            
+            const isClickInsideDocs = event.target.closest('#nav-dropdown-docs');
+            const navMenuDocs = document.getElementById('nav-menu-docs');
+            if (!isClickInsideDocs && navMenuDocs && !navMenuDocs.classList.contains('hidden')) {
+                navMenuDocs.classList.add('hidden');
+            }
+        });
 
         document.querySelectorAll('.main-nav-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
