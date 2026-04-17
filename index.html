@@ -180,7 +180,7 @@
                                     <li><code class="bg-gray-100 px-1 rounded text-blue-600">NUM_</code> → Nhập số/tiền (VD: NUM_GIA_TRI)</li>
                                     <li><code class="bg-gray-100 px-1 rounded text-blue-600">AREA_</code> → Văn bản dài (VD: AREA_GHI_CHU)</li>
                                     <li><code class="bg-gray-100 px-1 rounded text-blue-600">SELECT_</code> → Danh sách chọn</li>
-                                    <li><code class="bg-gray-100 px-1 rounded text-blue-600">TABLE_</code> → Bảng động (VD: TABLE_HANG_HOA)</li>
+                                    <li><code class="bg-gray-100 px-1 rounded text-blue-600">TABLE_</code> → Bảng động (VD: TABLE_HANG_HOA, TABLE_GIAO_HANG)</li>
                                     <li><code class="bg-gray-100 px-1 rounded text-blue-600">SIGN_</code> → Tên người ký</li>
                                     <li><code class="bg-gray-100 px-1 rounded text-gray-600">(khác)</code> → Ô nhập văn bản thường</li>
                                 </ul>
@@ -974,6 +974,31 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- Duplicate Document Modal -->
+    <div id="duplicate-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col transform transition-all">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-bold text-gray-800">Tạo bản sao tài liệu</h3>
+                <button onclick="document.getElementById('duplicate-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-gray-600 mb-2">Chọn phương thức tạo bản sao cho <strong id="duplicate-file-name" class="text-gray-900"></strong>:</p>
+                
+                <button id="btn-duplicate-version" class="w-full text-left p-4 rounded-xl border-2 border-blue-100 hover:border-blue-500 hover:bg-blue-50 transition drop-shadow-sm flex flex-col gap-1 group">
+                    <div class="font-semibold text-blue-800 group-hover:text-blue-900">Tạo phiên bản mới (Cập nhật thông tin)</div>
+                    <div class="text-xs text-blue-600 whitespace-normal">Thay đổi dữ liệu hiện tại. File mới sẽ tự tăng hậu tố (vd: V1 → V2).</div>
+                </button>
+
+                <button id="btn-duplicate-new" class="w-full text-left p-4 rounded-xl border-2 border-green-100 hover:border-green-500 hover:bg-green-50 transition drop-shadow-sm flex flex-col gap-1 group">
+                    <div class="font-semibold text-green-800 group-hover:text-green-900">Tạo file mới (Giữ nguyên bảng hàng hóa)</div>
+                    <div class="text-xs text-green-600 whitespace-normal">Tạo ra một tài liệu mới hoàn toàn, với dữ liệu và bảng hàng hóa được giữ nguyên để chỉnh sửa thêm.</div>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -2025,6 +2050,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const data = { ...pendingChainedData };
                 pendingChainedData = null; // Clear immediately to avoid loops
                 
+                // Merge all chained data directly into formData so hidden fields (like PHIEN_BAN) are not lost
+                Object.assign(formData, data);
+                
                 await new Promise(r => setTimeout(r, 400));
                 fillFormWithData(data);
                 
@@ -2220,6 +2248,12 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     tables['HANG_HOA'] ||
                     hangHoaSignals.some(sig => vars.has(sig));
 
+                const giaoHangSignals = ['TABLE_GIAO_HANG', 'GIAO_HANG', 'SO_SERIAL'];
+                const hasGiaoHangSignal = 
+                    tables['TABLE_GIAO_HANG'] || 
+                    tables['GIAO_HANG'] || 
+                    giaoHangSignals.some(sig => vars.has(sig) || cleanText.includes(`{${sig}}`));
+
                 // Trim tên biến có khoảng trắng (VD: " SDT_KH" → "SDT_KH")
                 // Một số file Word bị tách run tạo ra tên biến có space
                 const trimmedVars = new Set();
@@ -2236,6 +2270,14 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     tables['TABLE_HANG_HOA'] = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_VAT','NUM_THANH_TIEN','GHI_CHU'];
                     // Xóa các biến cột khỏi vars (sẽ do bảng quản lý)
                     ['TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU','STT'].forEach(v => vars.delete(v));
+                }
+
+                if (hasGiaoHangSignal) {
+                    tables['TABLE_GIAO_HANG'] = ['STT','TEN_HANG','DVT','NUM_SL','SO_SERIAL','GHI_CHU'];
+                    ['SO_SERIAL'].forEach(v => vars.delete(v));
+                    if (!hasHangHoaSignal) {
+                        ['TEN_HANG','DVT','NUM_SL','GHI_CHU','STT'].forEach(v => vars.delete(v));
+                    }
                 }
 
                 templateVariables = Array.from(vars);
@@ -2396,7 +2438,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         <div class="flex items-center gap-2">
                             <label class="text-xs font-medium text-blue-700">Số đợt:</label>
                             <select id="payment-installments-select" class="text-sm border border-blue-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 outline-none">
-                                ${[1,2,3,4,5].slice(0, maxDots).map(i => `<option value="${i}">${i} đợt</option>`).join('')}
+                                ${[1,2,3,4,5].map(i => `<option value="${i}" ${i === maxDots ? 'selected' : ''}>${i} đợt</option>`).join('')}
                             </select>
                         </div>
                     </div>
@@ -3223,17 +3265,26 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     let docXml = zip.files['word/document.xml'].asText();
 
                     // Tìm đoạn <w:p>...</w:p> chứa {TABLE_HANG_HOA} và thay bằng <w:tbl>
-                    // Pattern: tìm paragraph có text chứa TABLE_HANG_HOA
                     const tblParaRegex = /<w:p\b[^>]*>(?:[^<]|<(?!\/w:p>))*?\{TABLE_HANG_HOA\}(?:[^<]|<(?!\/w:p>))*?<\/w:p>/s;
 
                     if (tblParaRegex.test(docXml) && hangHoaData.length > 0) {
-                        // Tạo XML bảng Word thực sự
                         const tableXml = buildHangHoaTableXml(hangHoaData);
                         docXml = docXml.replace(tblParaRegex, tableXml);
                     } else if (tblParaRegex.test(docXml) && hangHoaData.length === 0) {
-                        // Không có hàng hóa → thay bằng đoạn text thông báo
                         const emptyPara = `<w:p><w:r><w:t>(Chưa có hàng hóa)</w:t></w:r></w:p>`;
                         docXml = docXml.replace(tblParaRegex, emptyPara);
+                    }
+
+                    // ── BƯỚC 1.5: Xử lý TABLE_GIAO_HANG ──
+                    const giaoHangData = finalData['TABLE_GIAO_HANG'] || [];
+                    const tblGhRegex = /<w:p\b[^>]*>(?:[^<]|<(?!\/w:p>))*?\{TABLE_GIAO_HANG\}(?:[^<]|<(?!\/w:p>))*?<\/w:p>/s;
+
+                    if (tblGhRegex.test(docXml) && giaoHangData.length > 0) {
+                        const ghXml = buildGiaoHangTableXml(giaoHangData);
+                        docXml = docXml.replace(tblGhRegex, ghXml);
+                    } else if (tblGhRegex.test(docXml) && giaoHangData.length === 0) {
+                        const emptyParaGh = `<w:p><w:r><w:t>(Chưa có dữ liệu giao hàng)</w:t></w:r></w:p>`;
+                        docXml = docXml.replace(tblGhRegex, emptyParaGh);
                     }
 
                     // Ghi lại XML đã sửa vào zip
@@ -4340,7 +4391,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     <div class="relative inline-block" id="cm-${doc.id}">
                         <button onclick="toggleChainMenu('${doc.id}')"
                                 class="text-green-700 bg-green-50 hover:bg-green-100 text-xs font-medium px-2 py-1 rounded border border-green-200 inline-flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Tạo tiếp
                         </button>
                         <div id="cd-${doc.id}"
@@ -4376,6 +4427,12 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     </td>
                     <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                         ${chainHtml}
+                        <button onclick="openDuplicateModal('${doc.id}', '${doc.name.replace(/'/g, "\\'")}')"
+                                class="inline-flex items-center gap-1 text-xs text-yellow-600 hover:text-yellow-800 px-2 py-1 rounded border border-yellow-200 hover:bg-yellow-50"
+                                title="Tạo bản sao">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            Bản sao
+                        </button>
                         <a href="${doc.webViewLink}" target="_blank"
                            class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50"
                            title="Xem trên Drive">
@@ -4539,7 +4596,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     THOI_HAN_THUC_HIEN:   '30 ngày kể từ ngày ký',
                     BAO_HANH:             '12 tháng',
                 },
-                BBGH: {
+                BBBG: {
                     SO_HOP_DONG:     (srcNum.startsWith('HD') ? srcNum : src['SO_HOP_DONG'] || srcNum),
                     SO_BAO_GIA:      (srcNum.startsWith('BG') ? srcNum : src['SO_BAO_GIA']  || ''),
                     DATE_NGAY_GIAO:  today,
@@ -4551,6 +4608,14 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         NUM_SL_THUC_GIAO: row['NUM_SL'] || '',
                         TINH_TRANG:       'Đủ',
                     })),
+                    TABLE_GIAO_HANG: (src['TABLE_HANG_HOA'] || []).map((row, idx) => ({
+                        STT: String(idx + 1),
+                        TEN_HANG: row['TEN_HANG'] || '',
+                        DVT: row['DVT'] || '',
+                        NUM_SL: row['NUM_SL'] || '',
+                        SO_SERIAL: '',
+                        GHI_CHU: ''
+                    }))
                 },
                 DNTT: {
                     SO_HOP_DONG:         (srcNum.startsWith('HD') ? srcNum : src['SO_HOP_DONG'] || srcNum),
@@ -4647,6 +4712,93 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             }
         };
 
+        let currentDuplicateDoc = null;
+
+        window.openDuplicateModal = function(fileId, fileName) {
+            currentDuplicateDoc = { id: fileId, name: fileName };
+            document.getElementById('duplicate-file-name').textContent = fileName;
+            document.getElementById('duplicate-modal').classList.remove('hidden');
+        };
+
+        async function handleDuplicate(mode) {
+            document.getElementById('duplicate-modal').classList.add('hidden');
+            if (!currentDuplicateDoc) return;
+            
+            showToast('Đang tải dữ liệu bản sao...');
+            
+            try {
+                let sourceData = {};
+                let templateName = '';
+                
+                const metaRes = await gapi.client.drive.files.get({
+                    fileId: currentDuplicateDoc.id, fields: 'appProperties'
+                });
+                const ap = metaRes.result.appProperties || {};
+                templateName = ap.templateName || '';
+
+                const savedKey = localStorage.getItem('docflow_lastkey_' + currentDuplicateDoc.id);
+                if (savedKey) {
+                    const raw = localStorage.getItem('docflow_formdata_' + savedKey);
+                    if (raw) { try { sourceData = JSON.parse(raw); } catch(e) {} }
+                }
+                
+                if (!savedKey && ap.formDataKey) {
+                    const raw = localStorage.getItem('docflow_formdata_' + ap.formDataKey);
+                    if (raw) { try { sourceData = JSON.parse(raw); } catch(e) {} }
+                }
+
+                if (Object.keys(sourceData).length === 0) {
+                    showToast('Không tìm thấy dữ liệu gốc của file này.', true);
+                    return;
+                }
+
+                // Locate the template to load
+                let templateToLoad = null;
+                if (templateName) {
+                    templateToLoad = templates.find(t => t.name === templateName);
+                }
+                
+                if (mode === 'version') {
+                    // Update version (PHIEN_BAN)
+                    let currentV = sourceData['PHIEN_BAN'] || 'v1';
+                    let match = currentV.match(/v(\d+)/i);
+                    if (match) {
+                        let num = parseInt(match[1]);
+                        sourceData['PHIEN_BAN'] = 'v' + (num + 1);
+                    } else {
+                        sourceData['PHIEN_BAN'] = 'v2';
+                    }
+                } else if (mode === 'new') {
+                    // Reset version, reset document number but keep tables
+                    sourceData['PHIEN_BAN'] = 'v1';
+                    ['MA_TAI_LIEU', 'SO_TAI_LIEU'].forEach(k => {
+                        if (sourceData[k]) sourceData[k] = '';
+                    });
+                }
+
+                if (templateToLoad) {
+                    await selectTemplate(templateToLoad);
+                    switchView('editor-view');
+                    await new Promise(r => setTimeout(r, 400));
+                    fillFormWithData(sourceData);
+                    if (sourceData.customerId) {
+                        selectCustomer(sourceData.customerId);
+                    }
+                    showToast('Đã tải thành công dữ liệu bản sao.');
+                } else {
+                    pendingChainedData = sourceData;
+                    switchView('editor-view');
+                    showToast('Không tìm thấy biểu mẫu gốc. Vui lòng chọn một biểu mẫu để áp dụng dữ liệu.', false, 5000);
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Lỗi khi tải dữ liệu bản sao', true);
+            }
+        }
+
+        document.getElementById('btn-duplicate-version').addEventListener('click', () => handleDuplicate('version'));
+        document.getElementById('btn-duplicate-new').addEventListener('click', () => handleDuplicate('new'));
+
         window.copyDocumentEdit = async function(fileId, fileName, templateName) {
             showToast("Đang chuẩn bị form...");
             try {
@@ -4710,17 +4862,20 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 }
 
                 const tableContainer = document.querySelector(
-                    '#table-' + tableName + ', [data-table-name="' + tableName + '"], [data-field-key="' + key + '"]'
+                    '#table-' + tableName + ', #table-' + key + ', [data-table-name="' + tableName + '"], [data-field-key="' + key + '"]'
                 );
                 if (!tableContainer) continue;
                 const tbody = tableContainer.querySelector('tbody');
                 if (!tbody) continue;
                 tbody.innerHTML = '';
                 const cols = Object.keys(value[0] || {}).filter(k => k !== 'STT');
+                const tName = (tableContainer.id && tableContainer.id.replace('table-', '')) || tableContainer.dataset.tableName || key;
                 value.forEach(rowData => {
-                    if (typeof addTableRow === 'function') addTableRow(tableName, cols, rowData);
+                    // Cần truyền đúng tên biến đang dùng (key) thay vì tableName
+                    // vì data được định nghĩa bằng key (ví dụ: TABLE_GIAO_HANG)
+                    if (typeof addTableRow === 'function') addTableRow(tName, cols, rowData);
                 });
-                if (typeof updateTableData === 'function') updateTableData(tableName, cols);
+                if (typeof updateTableData === 'function') updateTableData(tName, cols);
             }
         }
 
@@ -5265,6 +5420,92 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             </w:tbl>`;
 
             return tblXml;
+        }
+
+        function buildGiaoHangTableXml(giaoHangArr) {
+            const parseNum = s => parseFloat(String(s || '0').replace(/\./g, '').replace(',', '.')) || 0;
+            const fmtVND = n => Math.round(n).toLocaleString('vi-VN');
+
+            // Helper: XML cho border của cell
+            const borders = `<w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            </w:tcBorders>`;
+
+            // Helper: font run properties
+            const fontRpr = (bold = false, size = 20) => `<w:rPr>
+                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>
+                ${bold ? '<w:b/><w:bCs/>' : ''}
+                <w:sz w:val="${size}"/><w:szCs w:val="${size}"/>
+            </w:rPr>`;
+
+            // Helper: tạo 1 cell
+            const cell = (width, text, align = 'left', bold = false, shade = '') =>
+                `<w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="${width}" w:type="dxa"/>
+                        ${borders}
+                        ${shade ? `<w:shd w:val="clear" w:color="auto" w:fill="${shade}"/>` : ''}
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr>
+                            <w:jc w:val="${align}"/>
+                            <w:spacing w:before="40" w:after="40"/>
+                            <w:rPr>${fontRpr(bold)}</w:rPr>
+                        </w:pPr>
+                        <w:r>
+                            <w:rPr>${fontRpr(bold)}</w:rPr>
+                            <w:t xml:space="preserve">${String(text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</w:t>
+                        </w:r>
+                    </w:p>
+                </w:tc>`;
+
+            // ── Hàng tiêu đề ──
+            const headerRow = `<w:tr>
+                <w:trPr>
+                    <w:trHeight w:val="400" w:hRule="atLeast"/>
+                    <w:tblHeader/>
+                </w:trPr>
+                ${cell(600,  'STT',                   'center', true, 'D9E2F3')}
+                ${cell(3900, 'Tên hàng hóa / Dịch vụ','center', true, 'D9E2F3')}
+                ${cell(900,  'ĐVT',                   'center', true, 'D9E2F3')}
+                ${cell(900,  'Số lượng',              'center', true, 'D9E2F3')}
+                ${cell(1500, 'Số serial',             'center', true, 'D9E2F3')}
+                ${cell(2384, 'Ghi chú',               'center', true, 'D9E2F3')}
+            </w:tr>`;
+
+            // ── Các hàng dữ liệu ──
+            const dataRows = giaoHangArr.map((row, idx) => {
+                const shade = idx % 2 === 1 ? 'F2F2F2' : '';
+                return `<w:tr>
+                    <w:trPr><w:trHeight w:val="360" w:hRule="atLeast"/></w:trPr>
+                    ${cell(600,  String(idx + 1),          'center', false, shade)}
+                    ${cell(3900, row.TEN_HANG || '',       'left',   false, shade)}
+                    ${cell(900,  row.DVT || '',            'center', false, shade)}
+                    ${cell(900,  row.NUM_SL || '',         'center', false, shade)}
+                    ${cell(1500, row.SO_SERIAL || '',      'center', false, shade)}
+                    ${cell(2384, row.GHI_CHU || '',        'left',   false, shade)}
+                </w:tr>`;
+            });
+
+            return `<w:tbl>
+                <w:tblPr>
+                    <w:tblW w:w="10184" w:type="dxa"/>
+                    <w:tblLayout w:type="fixed"/>
+                </w:tblPr>
+                <w:tblGrid>
+                    <w:gridCol w:w="600"/>
+                    <w:gridCol w:w="3900"/>
+                    <w:gridCol w:w="900"/>
+                    <w:gridCol w:w="900"/>
+                    <w:gridCol w:w="1500"/>
+                    <w:gridCol w:w="2384"/>
+                </w:tblGrid>
+                ${headerRow}
+                ${dataRows.join('')}
+            </w:tbl>`;
         }
 
         function updatePaymentAmounts() {
