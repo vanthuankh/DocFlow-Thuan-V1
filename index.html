@@ -88,9 +88,10 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
                         <div class="absolute left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates(''); return false;">Tất cả mẫu</a>
                             <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('BG'); return false;">Báo giá</a>
                             <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('HD'); return false;">Hợp đồng</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('BBGH'); return false;">Biên bản giao hàng</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('BBBG'); return false;">Biên bản bàn giao</a>
                             <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('DNTT'); return false;">Đề nghị thanh toán</a>
                             <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterTemplates('PL'); return false;">Phụ lục hợp đồng</a>
                         </div>
@@ -102,9 +103,10 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
                         <div class="absolute left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments(''); return false;">Tất cả tài liệu</a>
                             <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('BG'); return false;">Báo giá</a>
                             <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('HD'); return false;">Hợp đồng</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('BBGH'); return false;">Biên bản giao hàng</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('BBBG'); return false;">Biên bản bàn giao</a>
                             <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('DNTT'); return false;">Đề nghị thanh toán</a>
                             <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onclick="filterDocuments('PL'); return false;">Phụ lục hợp đồng</a>
                         </div>
@@ -1012,6 +1014,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         let driveRootFolderId    = null;   // ID folder "DocFlow"
         let driveTemplateFolderId = null;  // ID folder "_template"
+        let driveTemplateSubfolderIds = {}; // ID subfolders of _template
         let driveSchemafolderId   = null;  // ID folder "_schemas"
         let driveCustomerFolderId = null;  // ID folder "Khach_hang"
         const driveDocFolderIds   = {};    // { 'BG': id, 'HD': id, ... }
@@ -1021,7 +1024,16 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             BG:   'Bao_Gia',
             HD:   'Hop_Dong',
             PL:   'Phu_Luc_HD',
-            BBGH: 'Bien_Ban_Giao_Hang',
+            BBBG: 'Bien_Ban_Ban_Giao',
+            BBNT: 'Bien_Ban_Nghiem_Thu',
+            DNTT: 'De_Nghi_Thanh_Toan',
+        };
+
+        const TPL_FOLDER_MAP = {
+            BG:   'Bao_Gia',
+            HD:   'Hop_Dong',
+            PL:   'Phu_Luc_HD',
+            BBBG: 'Bien_Ban_Ban_Giao',
             BBNT: 'Bien_Ban_Nghiem_Thu',
             DNTT: 'De_Nghi_Thanh_Toan',
         };
@@ -1098,6 +1110,62 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                             { key: 'NUM_SL', label: 'Số lượng', type: 'number' },
                             { key: 'NUM_DON_GIA', label: 'Đơn giá', type: 'number' }
                         ]}
+                    ]
+                }
+            },
+            {
+                id: 'builtin_hopdong',
+                name: 'Hợp đồng dịch vụ (Mặc định).html',
+                type: 'html',
+                source: 'builtin',
+                content: `
+                    <div style="font-family: 'Times New Roman', serif; padding: 20px; line-height: 1.5;">
+                        <h2 style="text-align: center; margin-bottom: 20px;">HỢP ĐỒNG DỊCH VỤ</h2>
+                        <p><strong>Bên A:</strong> {TEN_KHACH_HANG}</p>
+                        <p><strong>Bên B:</strong> Công ty TNHH Demo</p>
+                        <br/>
+                        <p><strong>Điều 1: Hàng hóa/Dịch vụ</strong></p>
+                        <table border="1" style="width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px;">
+                            <thead>
+                                <tr style="background-color: #f2f2f2;">
+                                    <th style="padding: 8px;">Tên dịch vụ/Sản phẩm</th>
+                                    <th style="padding: 8px;">Số lượng</th>
+                                    <th style="padding: 8px;">Đơn giá</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#TABLE_HANG_HOA}
+                                <tr>
+                                    <td style="padding: 8px;">{TEN_HANG}</td>
+                                    <td style="padding: 8px; text-align: center;">{NUM_SL}</td>
+                                    <td style="padding: 8px; text-align: right;">{NUM_DON_GIA}</td>
+                                </tr>
+                                {/TABLE_HANG_HOA}
+                            </tbody>
+                        </table>
+                        <p><strong>Tổng giá trị hợp đồng:</strong> {TONG_THANH_TOAN} VNĐ</p>
+                        <p><strong>Bằng chữ:</strong> <em>{TIEN_BANG_CHU}</em></p>
+                        <br/>
+                        <p><strong>Điều 2: Điều khoản thanh toán</strong></p>
+                        <ul style="list-style-type: none; padding-left: 0;">
+                            <li><strong>Đợt 1 ({DOT_1_TY_LE}%):</strong> Thanh toán {DOT_1_SO_TIEN} VNĐ (Bằng chữ: {DOT_1_BANG_CHU}) sau khi ký hợp đồng.</li>
+                            <li><strong>Đợt 2 ({DOT_2_TY_LE}%):</strong> Thanh toán {DOT_2_SO_TIEN} VNĐ (Bằng chữ: {DOT_2_BANG_CHU}) sau khi bàn giao.</li>
+                            <li><strong>Đợt 3 ({DOT_3_TY_LE}%):</strong> Thanh toán {DOT_3_SO_TIEN} VNĐ (Bằng chữ: {DOT_3_BANG_CHU}) sau khi nghiệm thu.</li>
+                        </ul>
+                    </div>
+                `,
+                schema: {
+                    fields: [
+                        { key: 'TEN_KHACH_HANG', label: 'Tên Khách Hàng', type: 'text', required: true, group: 'Thông tin chung', order: 1 },
+                        { key: 'DOT_1_TY_LE', label: 'Tỷ lệ thanh toán đợt 1 (%)', type: 'number', required: true, group: 'Thanh toán', order: 2 },
+                        { key: 'DOT_1_SO_TIEN', label: 'Số tiền đợt 1', type: 'text', group: 'Thanh toán', order: 3 },
+                        { key: 'DOT_1_BANG_CHU', label: 'Bằng chữ đợt 1', type: 'text', group: 'Thanh toán', order: 4 },
+                        { key: 'DOT_2_TY_LE', label: 'Tỷ lệ thanh toán đợt 2 (%)', type: 'number', required: true, group: 'Thanh toán', order: 5 },
+                        { key: 'DOT_2_SO_TIEN', label: 'Số tiền đợt 2', type: 'text', group: 'Thanh toán', order: 6 },
+                        { key: 'DOT_2_BANG_CHU', label: 'Bằng chữ đợt 2', type: 'text', group: 'Thanh toán', order: 7 },
+                        { key: 'DOT_3_TY_LE', label: 'Tỷ lệ thanh toán đợt 3 (%)', type: 'number', required: true, group: 'Thanh toán', order: 8 },
+                        { key: 'DOT_3_SO_TIEN', label: 'Số tiền đợt 3', type: 'text', group: 'Thanh toán', order: 9 },
+                        { key: 'DOT_3_BANG_CHU', label: 'Bằng chữ đợt 3', type: 'text', group: 'Thanh toán', order: 10 }
                     ]
                 }
             }
@@ -1335,10 +1403,35 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     driveDocFolderIds[code] = existingFolders[folderName];
                 });
 
+                // Create subfolders inside _template
+                const tplRes = await gapi.client.drive.files.list({
+                    q: `'${driveTemplateFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+                    fields: 'files(id,name)',
+                    spaces: 'drive',
+                });
+                const existingTplF = {};
+                (tplRes.result.files || []).forEach(f => existingTplF[f.name] = f.id);
+                
+                for (const [code, name] of Object.entries(TPL_FOLDER_MAP)) {
+                    if (!existingTplF[name]) {
+                        const res = await gapi.client.drive.files.create({
+                            resource: {
+                                name: name,
+                                mimeType: 'application/vnd.google-apps.folder',
+                                parents: [driveTemplateFolderId]
+                            },
+                            fields: 'id'
+                        });
+                        existingTplF[name] = res.result.id;
+                    }
+                    driveTemplateSubfolderIds[code] = existingTplF[name];
+                }
+
                 // Lưu cache vào localStorage để không phải query lại mỗi lần
                 localStorage.setItem('docflow_folder_ids', JSON.stringify({
                     root:      driveRootFolderId,
                     templates: driveTemplateFolderId,
+                    templatesSub: driveTemplateSubfolderIds,
                     schemas:   driveSchemafolderId,
                     customers: driveCustomerFolderId,
                     docs:      driveDocFolderIds,
@@ -1361,6 +1454,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 if (Date.now() - data.cachedAt > 86400000) return false;
                 driveRootFolderId     = data.root;
                 driveTemplateFolderId = data.templates;
+                driveTemplateSubfolderIds = data.templatesSub || {};
                 driveSchemafolderId   = data.schemas;
                 driveCustomerFolderId = data.customers;
                 Object.assign(driveDocFolderIds, data.docs || {});
@@ -1740,7 +1834,15 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     if (accessToken && driveTemplateFolderId) {
                         try {
                             const blob = new Blob([content], { type: mimeType });
-                            const savedFile = await saveFileToDrive(blob, file.name, mimeType, null, null, driveTemplateFolderId);
+                            let targetFolderId = driveTemplateFolderId;
+                            
+                            // Xác định folder con phù hợp
+                            const docType = detectDocTypeFromName(file.name);
+                            if (docType && driveTemplateSubfolderIds && driveTemplateSubfolderIds[docType]) {
+                                targetFolderId = driveTemplateSubfolderIds[docType];
+                            }
+                            
+                            const savedFile = await saveFileToDrive(blob, file.name, mimeType, null, null, targetFolderId);
                             if (savedFile && savedFile.id) {
                                 templateObj.id = savedFile.id;
                                 templateObj.source = 'drive';
@@ -1832,6 +1934,13 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         }
 
         async function selectTemplate(template) {
+            const newDocType = detectDocTypeFromName(template.name);
+            const currentMa = formData['MA_TAI_LIEU'] || '';
+            if (currentMa && !currentMa.toUpperCase().startsWith(newDocType)) {
+                delete formData['MA_TAI_LIEU'];
+                delete formData['SO_TAI_LIEU'];
+            }
+
             currentTemplate = template;
             renderTemplateList(); // Update selection visual
             
@@ -2392,16 +2501,16 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     </div>
                     <div class="border border-gray-200 border-t-0 rounded-b-xl overflow-hidden">
                         <div class="overflow-x-auto w-full">
-                            <table class="w-full text-sm min-w-[800px]" id="table-hang-hoa">
+                            <table class="w-full text-sm min-w-[800px] table-fixed" id="table-hang-hoa">
                                 <thead>
                                     <tr class="bg-gray-700 text-white">
-                                        <th class="px-3 py-2.5 text-center font-semibold w-full border-r border-gray-600">Tên sản phẩm</th>
+                                        <th class="px-3 py-2.5 text-center font-semibold border-r border-gray-600">Tên sản phẩm</th>
                                         <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 80px;">Đơn vị tính</th>
                                         <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 80px;">Số lượng</th>
                                         <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 140px;">Đơn giá</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 70px;">Thuế</th>
+                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 90px;">Thuế</th>
                                         <th class="px-2 py-2.5 text-center font-semibold bg-blue-800" style="width: 160px;">Thành tiền</th>
-                                        <th class="w-8"></th>
+                                        <th style="width: 40px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-hang-hoa" class="divide-y divide-gray-100 bg-white"></tbody>
@@ -2745,6 +2854,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 formData['TIEN_BANG_CHU'] = bangChu;
                 const bcEl = document.querySelector('[data-var="TIEN_BANG_CHU"]');
                 if (bcEl) bcEl.value = bangChu;
+            }
+
+            if (typeof updatePaymentAmounts === 'function') {
+                updatePaymentAmounts();
             }
         }
 
@@ -3505,11 +3618,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                   ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-100">Tạm dừng</span>'
                   : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">Hoạt động</span>';
 
-                const TYPE_LABELS = { BG:'Báo Giá', HD:'Hợp Đồng', BBGH:'BBGH', DNTT:'ĐNTT', PL:'Phụ Lục', BBNT:'BBNT' };
+                const TYPE_LABELS = { BG:'Báo Giá', HD:'Hợp Đồng', BBBG:'Biên Bản Bàn Giao', DNTT:'Đề Nghị Thanh Toán', PL:'Phụ Lục', BBNT:'Biên Bản Nghiệm Thu' };
                 const TYPE_COLORS = {
                     BG:   'bg-blue-100 text-blue-800',
                     HD:   'bg-purple-100 text-purple-800',
-                    BBGH: 'bg-amber-100 text-amber-800',
+                    BBBG: 'bg-amber-100 text-amber-800',
                     DNTT: 'bg-teal-100 text-teal-800',
                     PL:   'bg-indigo-100 text-indigo-800',
                     BBNT: 'bg-gray-100 text-gray-800',
@@ -4069,7 +4182,12 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             try {
                 let q = "(mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document' or mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') and trashed=false and not appProperties has { key='docflow' and value='generated' }";
                 if (driveTemplateFolderId) {
-                    q += ` and '${driveTemplateFolderId}' in parents`;
+                    const parentIds = [driveTemplateFolderId];
+                    if (driveTemplateSubfolderIds) {
+                        parentIds.push(...Object.values(driveTemplateSubfolderIds).filter(Boolean));
+                    }
+                    const parentsQuery = parentIds.map(id => `'${id}' in parents`).join(' or ');
+                    q += ` and (${parentsQuery})`;
                 }
 
                 const response = await gapi.client.drive.files.list({
@@ -4155,11 +4273,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     custNames.map(n => `<option value="${n}" ${n===currentVal?'selected':''}>${n}</option>`).join('');
             }
 
-            const TYPE_LABELS = { BG:'Báo Giá', HD:'Hợp Đồng', BBGH:'BBGH', DNTT:'ĐNTT', PL:'Phụ Lục', BBNT:'BBNT' };
+            const TYPE_LABELS = { BG:'Báo Giá', HD:'Hợp Đồng', BBBG:'Biên Bản Bàn Giao', DNTT:'Đề Nghị Thanh Toán', PL:'Phụ Lục', BBNT:'Biên Bản Nghiệm Thu' };
             const TYPE_COLORS = {
                 BG:   'bg-blue-100 text-blue-800',
                 HD:   'bg-purple-100 text-purple-800',
-                BBGH: 'bg-amber-100 text-amber-800',
+                BBBG: 'bg-amber-100 text-amber-800',
                 DNTT: 'bg-teal-100 text-teal-800',
                 PL:   'bg-indigo-100 text-indigo-800',
                 BBNT: 'bg-gray-100 text-gray-800',
@@ -4562,6 +4680,20 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             for (const [key, value] of Object.entries(data)) {
                 if (!key.startsWith('TABLE_') || !Array.isArray(value) || value.length === 0) continue;
                 const tableName = key.substring(6);
+
+                if (tableName === 'HANG_HOA') {
+                    const tbody = document.getElementById('tbody-hang-hoa');
+                    if (tbody) {
+                        tbody.innerHTML = '';
+                        value.forEach(rowData => {
+                            if (typeof addHangHoaRow === 'function') addHangHoaRow(rowData);
+                        });
+                        if (typeof updateHangHoaTotals === 'function') updateHangHoaTotals();
+                        if (typeof syncHangHoaData === 'function') syncHangHoaData();
+                    }
+                    continue;
+                }
+
                 const tableContainer = document.querySelector(
                     '#table-' + tableName + ', [data-table-name="' + tableName + '"], [data-field-key="' + key + '"]'
                 );
@@ -4787,7 +4919,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 BG:   `BG-${docNum}-${clientShort}-${dateStr}-${phienBan}.${ext}`,
                 HD:   `HD-${docNum}-${relatedBG ? relatedBG + '-' : ''}${clientShort}-${dateStr}-${phienBan}.${ext}`,
                 PL:   `PLHD-${relatedHD ? relatedHD + '-' : ''}${clientShort}-${soPhuLuc}.${ext}`,
-                BBGH: `BBGH-${relatedBG ? relatedBG + '-' : ''}${clientShort}-${dateStr}-${phienBan}.${ext}`,
+                BBBG: `BBBG-${relatedHD ? relatedHD + '-' : (relatedBG ? relatedBG + '-' : '')}${clientShort}-${dateStr}-${phienBan}.${ext}`,
                 BBNT: `BBNT-${docNum}-${clientShort}-${dateStr}-${phienBan}.${ext}`,
                 DNTT: `DNTT-${relatedHD ? relatedHD + '-' : ''}${clientShort}-${dateStr}-${phienBan}.${ext}`,
             };
@@ -4799,7 +4931,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const n = (name || '').toLowerCase();
             if (n.startsWith('bg-') || n.includes('bao_gia') || n.includes('bao-gia') || n.includes('báo giá') || n.includes('quote') || n.includes('quotation')) return 'BG';
             if (n.startsWith('hd-') || n.includes('hop_dong') || n.includes('hop-dong') || n.includes('hợp đồng') || n.includes('contract')) return 'HD';
-            if (n.startsWith('bbgh-') || n.includes('giao_hang') || n.includes('giao-hang') || n.includes('giao hàng') || n.includes('delivery')) return 'BBGH';
+            if (n.startsWith('bbbg-') || n.startsWith('bbgh-') || n.includes('ban_giao') || n.includes('bàn giao') || n.includes('giao_hang') || n.includes('giao hàng') || n.includes('delivery')) return 'BBBG';
             if (n.startsWith('bbnt-') || n.includes('nghiem_thu') || n.includes('nghiệm thu') || n.includes('acceptance')) return 'BBNT';
             if (n.startsWith('dntt-') || n.includes('thanh_toan') || n.includes('thanh-toan') || n.includes('thanh toán') || n.includes('payment')) return 'DNTT';
             if (n.includes('phu_luc') || n.includes('phu-luc') || n.includes('phụ lục') || n.includes('appendix') || n.includes('annex')) return 'PL';
@@ -4809,25 +4941,25 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         const CHAIN_OPTIONS = {
             BG:   [
                 { type: 'HD',   label: 'Tạo Hợp Đồng',           colorClass: 'text-purple-700 hover:bg-purple-50' },
-                { type: 'BBGH', label: 'Tạo Biên Bản Giao Hàng', colorClass: 'text-amber-700  hover:bg-amber-50'  },
+                { type: 'BBBG', label: 'Tạo Biên Bản Bàn Giao',  colorClass: 'text-amber-700  hover:bg-amber-50'  },
             ],
             HD:   [
-                { type: 'BBGH', label: 'Tạo Biên Bản Giao Hàng', colorClass: 'text-amber-700  hover:bg-amber-50'  },
+                { type: 'BBBG', label: 'Tạo Biên Bản Bàn Giao',  colorClass: 'text-amber-700  hover:bg-amber-50'  },
                 { type: 'DNTT', label: 'Tạo Đề Nghị Thanh Toán', colorClass: 'text-teal-700   hover:bg-teal-50'   },
             ],
-            BBGH: [
+            BBBG: [
                 { type: 'DNTT', label: 'Tạo Đề Nghị Thanh Toán', colorClass: 'text-teal-700   hover:bg-teal-50'   },
             ],
         };
 
         const TYPE_KEYWORDS = {
             HD:   ['hop_dong','hop-dong','hợp đồng','contract','hd-'],
-            BBGH: ['giao_hang','giao-hang','giao hàng','delivery','bbgh-'],
+            BBBG: ['ban_giao','bàn giao','giao_hang','giao-hang','giao hàng','delivery','bbbg-','bbgh-'],
             DNTT: ['thanh_toan','thanh-toan','thanh toán','payment','dntt-'],
         };
 
         const TYPE_LABELS = {
-            HD: 'Hợp Đồng', BBGH: 'Biên Bản Giao Hàng', DNTT: 'Đề Nghị Thanh Toán'
+            HD: 'Hợp Đồng', BBBG: 'Biên Bản Bàn Giao', DNTT: 'Đề Nghị Thanh Toán'
         };
 
         function detectDocTypeFromFormData(formData, templateName) {
@@ -4836,7 +4968,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             if (ma.startsWith('BG'))   return 'BG';
             if (ma.startsWith('HD'))   return 'HD';
             if (ma.startsWith('PL'))   return 'PL';
-            if (ma.startsWith('BBGH')) return 'BBGH';
+            if (ma.startsWith('BBBG') || ma.startsWith('BBGH')) return 'BBBG';
             if (ma.startsWith('BBNT')) return 'BBNT';
             if (ma.startsWith('DNTT')) return 'DNTT';
 
@@ -4857,7 +4989,13 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 : today.toLocaleDateString('vi-VN', { day:'numeric', month:'long', year:'numeric' });
 
             if (!computed['MA_TAI_LIEU']) {
-                computed['MA_TAI_LIEU'] = 'BG-' + today.getFullYear() + '-' + String(Date.now()).slice(-4);
+                let prefix = 'TL';
+                if (typeof detectDocTypeFromName === 'function' && window.currentTemplate) {
+                    prefix = detectDocTypeFromName(window.currentTemplate.name);
+                } else if (!window.currentTemplate) {
+                    prefix = 'BG'; // fallback if no template selected yet
+                }
+                computed['MA_TAI_LIEU'] = prefix + '-' + today.getFullYear() + '-' + String(Date.now()).slice(-4);
             }
 
             // Tổng tiền = tổng NUM_THANH_TIEN từng dòng (đã gồm VAT riêng của mỗi dòng)
