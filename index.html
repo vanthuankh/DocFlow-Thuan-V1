@@ -2088,6 +2088,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             try {
                 const vars = new Set();
                 const tables = {};
+                let cleanText = "";
                 
                 if (template.type === 'xlsx') {
                     const data = template.content instanceof ArrayBuffer ? new Uint8Array(template.content) : template.content;
@@ -2188,7 +2189,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     });
                     
                     // Lấy text thô từ TẤT CẢ các file XML trong word/ để tìm biến chính xác hơn (bao gồm header, footer, bảng)
-                    let cleanText = "";
+                    cleanText = "";
                     try {
                         Object.keys(zip.files).forEach(fileName => {
                             if (fileName.startsWith("word/") && fileName.endsWith(".xml")) {
@@ -2248,6 +2249,12 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     tables['HANG_HOA'] ||
                     hangHoaSignals.some(sig => vars.has(sig));
 
+                const hangHoaTaSignals = ['TABLE_HANG_HOA_TA', 'HANG_HOA_TA'];
+                const hasHangHoaTaSignal =
+                    tables['TABLE_HANG_HOA_TA'] ||
+                    tables['HANG_HOA_TA'] ||
+                    hangHoaTaSignals.some(sig => vars.has(sig));
+
                 const giaoHangSignals = ['TABLE_GIAO_HANG', 'GIAO_HANG', 'SO_SERIAL'];
                 const hasGiaoHangSignal = 
                     tables['TABLE_GIAO_HANG'] || 
@@ -2265,9 +2272,10 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     vars.add(v);
                 }
 
-                if (hasHangHoaSignal) {
-                    // Đảm bảo TABLE_HANG_HOA có trong tables với đúng cột
-                    tables['TABLE_HANG_HOA'] = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_VAT','NUM_THANH_TIEN','GHI_CHU'];
+                if (hasHangHoaSignal || hasHangHoaTaSignal) {
+                    // Đảm bảo TABLE_HANG_HOA / TABLE_HANG_HOA_TA có trong tables với đúng cột
+                    if (hasHangHoaSignal) tables['TABLE_HANG_HOA'] = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_VAT','NUM_THANH_TIEN','GHI_CHU'];
+                    if (hasHangHoaTaSignal) tables['TABLE_HANG_HOA_TA'] = ['STT','TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_VAT','NUM_THANH_TIEN','GHI_CHU'];
                     // Xóa các biến cột khỏi vars (sẽ do bảng quản lý)
                     ['TEN_HANG','DVT','NUM_SL','NUM_DON_GIA','NUM_THANH_TIEN','GHI_CHU','STT'].forEach(v => vars.delete(v));
                 }
@@ -2338,11 +2346,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             }
 
             const paymentVars = [
-                'DOT_1_TY_LE', 'DOT_1_SO_TIEN', 'DOT_1_BANG_CHU',
-                'DOT_2_TY_LE', 'DOT_2_SO_TIEN', 'DOT_2_BANG_CHU',
-                'DOT_3_TY_LE', 'DOT_3_SO_TIEN', 'DOT_3_BANG_CHU',
-                'DOT_4_TY_LE', 'DOT_4_SO_TIEN', 'DOT_4_BANG_CHU',
-                'DOT_5_TY_LE', 'DOT_5_SO_TIEN', 'DOT_5_BANG_CHU'
+                'DOT_1_TY_LE', 'DOT_1_SO_TIEN', 'DOT_1_BANG_CHU', 'DOT_1_BANG_CHU_TA',
+                'DOT_2_TY_LE', 'DOT_2_SO_TIEN', 'DOT_2_BANG_CHU', 'DOT_2_BANG_CHU_TA',
+                'DOT_3_TY_LE', 'DOT_3_SO_TIEN', 'DOT_3_BANG_CHU', 'DOT_3_BANG_CHU_TA',
+                'DOT_4_TY_LE', 'DOT_4_SO_TIEN', 'DOT_4_BANG_CHU', 'DOT_4_BANG_CHU_TA',
+                'DOT_5_TY_LE', 'DOT_5_SO_TIEN', 'DOT_5_BANG_CHU', 'DOT_5_BANG_CHU_TA'
             ];
             const normalVars = templateVariables.filter(v => !paymentVars.includes(v.trim()));
             const hasPaymentVars = templateVariables.some(v => paymentVars.includes(v.trim()));
@@ -2502,6 +2510,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         formData[`DOT_${i}_TY_LE`] = '';
                         formData[`DOT_${i}_SO_TIEN`] = '';
                         formData[`DOT_${i}_BANG_CHU`] = '';
+                        formData[`DOT_${i}_BANG_CHU_TA`] = '';
                     }
                     renderInstallments();
                 });
@@ -2532,6 +2541,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const hasHangHoa = currentTemplate &&
                 (currentTemplate.type === 'docx' ||
                  templateTables['TABLE_HANG_HOA'] ||
+                 templateTables['TABLE_HANG_HOA_TA'] ||
+                 templateTables['HANG_HOA_TA'] ||
                  templateTables['HANG_HOA']);
 
             if (hasHangHoa) {
@@ -2595,7 +2606,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
             // Các bảng khác (nếu có) — giữ nguyên
             for (const [tableName, cols] of Object.entries(templateTables)) {
-                if (tableName === 'TABLE_HANG_HOA' || tableName === 'HANG_HOA') continue; // Đã xử lý ở trên
+                if (tableName === 'TABLE_HANG_HOA' || tableName === 'HANG_HOA' || tableName === 'TABLE_HANG_HOA_TA' || tableName === 'HANG_HOA_TA') continue; // Đã xử lý ở trên
                 const tableDiv = document.createElement('div');
                 tableDiv.className = 'col-span-full mt-4 border border-gray-200 rounded-lg overflow-hidden bg-white min-w-0 w-full';
                 let ths = cols.map(c => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">${c}</th>`).join('');
@@ -2854,6 +2865,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 });
             });
             formData['TABLE_HANG_HOA'] = rows;
+            formData['TABLE_HANG_HOA_TA'] = rows;
         }
 
         function updateHangHoaTotals() {
@@ -2911,6 +2923,12 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 formData['TIEN_BANG_CHU'] = bangChu;
                 const bcEl = document.querySelector('[data-var="TIEN_BANG_CHU"]');
                 if (bcEl) bcEl.value = bangChu;
+            }
+            if (typeof numberToEnglishWords === 'function') {
+                const bangChuTa = numberToEnglishWords(tongTT);
+                formData['TIEN_BANG_CHU_TA'] = bangChuTa;
+                const bcTaEl = document.querySelector('[data-var="TIEN_BANG_CHU_TA"]');
+                if (bcTaEl) bcTaEl.value = bangChuTa;
             }
 
             if (typeof updatePaymentAmounts === 'function') {
@@ -3275,6 +3293,18 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         docXml = docXml.replace(tblParaRegex, emptyPara);
                     }
 
+                    // ── BƯỚC 1.1: Xử lý TABLE_HANG_HOA_TA ──
+                    const hangHoaTaData = finalData['TABLE_HANG_HOA_TA'] || [];
+                    const tblTaParaRegex = /<w:p\b[^>]*>(?:[^<]|<(?!\/w:p>))*?\{TABLE_HANG_HOA_TA\}(?:[^<]|<(?!\/w:p>))*?<\/w:p>/s;
+
+                    if (tblTaParaRegex.test(docXml) && hangHoaTaData.length > 0) {
+                        const tableTaXml = buildHangHoaTableTaXml(hangHoaTaData);
+                        docXml = docXml.replace(tblTaParaRegex, tableTaXml);
+                    } else if (tblTaParaRegex.test(docXml) && hangHoaTaData.length === 0) {
+                        const emptyParaTa = `<w:p><w:r><w:t>(Chưa có hàng hóa / No commodities)</w:t></w:r></w:p>`;
+                        docXml = docXml.replace(tblTaParaRegex, emptyParaTa);
+                    }
+
                     // ── BƯỚC 1.5: Xử lý TABLE_GIAO_HANG ──
                     const giaoHangData = finalData['TABLE_GIAO_HANG'] || [];
                     const tblGhRegex = /<w:p\b[^>]*>(?:[^<]|<(?!\/w:p>))*?\{TABLE_GIAO_HANG\}(?:[^<]|<(?!\/w:p>))*?<\/w:p>/s;
@@ -3320,63 +3350,64 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         saveAs(out, fileName.replace(/\.(docx|xlsx)$/, '.docx'));
                         showToast("Đã tải xuống file DOCX");
                     } else if (type === 'pdf') {
-                        const arrayBuffer = await out.arrayBuffer();
-                        const Mammoth = window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
-                        if (!Mammoth) throw new Error("Thư viện mammoth chưa được tải.");
-                        const mammothResult = await Mammoth.convertToHtml({ arrayBuffer });
+                        try {
+                            const arrayBuffer = await out.arrayBuffer();
+                            const Mammoth = window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
+                            if (!Mammoth) throw new Error("Thư viện mammoth chưa được tải.");
+                            const mammothResult = await Mammoth.convertToHtml({ arrayBuffer });
 
-                        const tempDiv = document.createElement('div');
-                        tempDiv.style.cssText = [
-                            'width:210mm',
-                            'padding:15mm 20mm',
-                            'font-family:Times New Roman,serif',
-                            'font-size:12pt',
-                            'line-height:1.6',
-                            'color:#000',
-                            'background:#fff',
-                            'box-sizing:border-box',
-                        ].join(';');
-                        tempDiv.innerHTML = mammothResult.value;
-                        // Gắn vào body theo luồng bình thường (không dùng absolute)
-                        // để html2canvas đo được chiều cao đúng
-                        tempDiv.style.position = 'fixed';
-                        tempDiv.style.top = '0';
-                        tempDiv.style.left = '0';
-                        tempDiv.style.zIndex = '-1';
-                        tempDiv.style.opacity = '0';
-                        document.body.appendChild(tempDiv);
+                            const tempDiv = document.createElement('div');
+                            tempDiv.style.cssText = [
+                                'width:210mm',
+                                'padding:15mm 20mm',
+                                'font-family:Times New Roman,serif',
+                                'font-size:12pt',
+                                'line-height:1.6',
+                                'color:#000',
+                                'background:#fff',
+                                'box-sizing:border-box',
+                                'position:absolute',
+                                'top':'0',
+                                'left':'0',
+                                'z-index':'-9999'
+                            ].join(';');
+                            tempDiv.innerHTML = mammothResult.value;
+                            document.body.appendChild(tempDiv);
 
-                        // Đợi render xong
-                        await new Promise(r => setTimeout(r, 200));
+                            // Đợi render xong
+                            await new Promise(r => setTimeout(r, 200));
 
-                        const opt = {
-                            margin:      [10, 15, 10, 15],
-                            image:       { type: 'jpeg', quality: 0.98 },
-                            html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
-                            jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                        };
-
-                        // Lấy blob thay vì save thẳng
-                        const pdfBlob = await html2pdf()
-                            .set(opt)
-                            .from(tempDiv)
-                            .output('blob');
-
-                        document.body.removeChild(tempDiv);
-
-                        if (pdfBlob && pdfBlob.size > 1000) {
-                            const pdfFileName = fileName.replace(/\.(docx|xlsx)$/, '.pdf');
-                            saveAs(pdfBlob, pdfFileName);
-                            showToast('Đã tải xuống file PDF');
-                            // Gán resultObj cho save-to-Drive path
-                            resultObj = {
-                                type: 'pdf', blob: pdfBlob, extension: 'pdf',
-                                mimeType: 'application/pdf',
-                                fileName: pdfFileName, docTypeCode: docTypeCode
+                            const opt = {
+                                margin:      [10, 15, 10, 15],
+                                image:       { type: 'jpeg', quality: 0.98 },
+                                html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
+                                jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
                             };
-                            return resultObj;
-                        } else {
-                            showToast('Lỗi tạo PDF: file trống. Thử tải DOCX và chuyển đổi bên ngoài.', true);
+
+                            // Lấy blob thay vì save thẳng
+                            const pdfBlob = await html2pdf()
+                                .set(opt)
+                                .from(tempDiv)
+                                .output('blob');
+
+                            document.body.removeChild(tempDiv);
+
+                            if (pdfBlob && pdfBlob.size > 1000) {
+                                const pdfFileName = fileName.replace(/\.(docx|xlsx)$/, '.pdf');
+                                saveAs(pdfBlob, pdfFileName);
+                                showToast('Đã tải xuống file PDF');
+                                // Gán resultObj cho save-to-Drive path
+                                resultObj = {
+                                    type: 'pdf', blob: pdfBlob, extension: 'pdf',
+                                    mimeType: 'application/pdf',
+                                    fileName: pdfFileName, docTypeCode: docTypeCode
+                                };
+                            } else {
+                                throw new Error("File PDF trống.");
+                            }
+                        } catch (pdfError) {
+                            console.error("Lỗi tạo PDF:", pdfError);
+                            throw new Error("PDF_CONVERSION_ERROR");
                         }
                     }
                     
@@ -3428,6 +3459,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     isKnownError = true;
                 } else if (error.message === "Multi error" || (error.properties && error.properties.errors)) {
                     msg = getDocxtemplaterErrorMessage(error);
+                    isKnownError = true;
+                } else if (error.message === "PDF_CONVERSION_ERROR") {
+                    msg = "Trình chuyển đổi HTML sang PDF gặp sự cố (có thể do lỗi font hoặc CSS phức tạp). Vui lòng thử tải DOCX thay thế.";
                     isKnownError = true;
                 } else {
                     msg = error.message || msg;
@@ -4581,6 +4615,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 TABLE_HANG_HOA:  Array.isArray(src['TABLE_HANG_HOA'])
                                     ? JSON.parse(JSON.stringify(src['TABLE_HANG_HOA']))
                                     : [],
+                TABLE_HANG_HOA_TA:  Array.isArray(src['TABLE_HANG_HOA_TA'])
+                                    ? JSON.parse(JSON.stringify(src['TABLE_HANG_HOA_TA']))
+                                    : [],
                 TONG_CONG:       src['TONG_CONG']     || '',
                 TIEN_BANG_CHU:   src['TIEN_BANG_CHU'] || '',
                 DATE_NGAY_LAP:   today,
@@ -4604,6 +4641,11 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     NGUOI_GIAO:      src['NGUOI_KY_A'] || '',
                     NGUOI_NHAN:      src['NGUOI_LH']   || '',
                     TABLE_HANG_HOA:  (src['TABLE_HANG_HOA'] || []).map(row => ({
+                        ...row,
+                        NUM_SL_THUC_GIAO: row['NUM_SL'] || '',
+                        TINH_TRANG:       'Đủ',
+                    })),
+                    TABLE_HANG_HOA_TA:  (src['TABLE_HANG_HOA_TA'] || []).map(row => ({
                         ...row,
                         NUM_SL_THUC_GIAO: row['NUM_SL'] || '',
                         TINH_TRANG:       'Đủ',
@@ -4848,7 +4890,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 if (!key.startsWith('TABLE_') || !Array.isArray(value) || value.length === 0) continue;
                 const tableName = key.substring(6);
 
-                if (tableName === 'HANG_HOA') {
+                if (tableName === 'HANG_HOA' || tableName === 'HANG_HOA_TA') {
                     const tbody = document.getElementById('tbody-hang-hoa');
                     if (tbody) {
                         tbody.innerHTML = '';
@@ -5037,6 +5079,42 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             return result.trim().charAt(0).toUpperCase() + result.trim().slice(1) + ' đồng';
         }
 
+        function numberToEnglishWords(amount) {
+            if (!amount || amount === 0) return 'Zero VND only';
+            const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+            const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+            
+            function convertGroup(n) {
+                let str = '';
+                if (n > 99) {
+                    str += ones[Math.floor(n / 100)] + ' Hundred ';
+                    n %= 100;
+                }
+                if (n > 19) {
+                    str += tens[Math.floor(n / 10)] + ' ';
+                    n %= 10;
+                }
+                if (n > 0) {
+                    str += ones[n] + ' ';
+                }
+                return str.trim();
+            }
+
+            const groups = [
+                { val: Math.floor(amount / 1e9) % 1000, unit: 'Billion' },
+                { val: Math.floor(amount / 1e6) % 1000, unit: 'Million' },
+                { val: Math.floor(amount / 1e3) % 1000, unit: 'Thousand' },
+                { val: amount % 1000, unit: '' }
+            ];
+            
+            let result = '';
+            groups.forEach(g => {
+                if (g.val > 0) result += convertGroup(g.val) + (g.unit ? ' ' + g.unit : '') + ' ';
+            });
+            
+            return result.trim() + ' VND only.';
+        }
+
         function formatVND(n) {
             return new Intl.NumberFormat('vi-VN').format(Math.round(n || 0));
         }
@@ -5181,6 +5259,20 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 tongCong += tt;
             });
 
+            // Nếu TABLE_HANG_HOA_TA rỗng, lấy từ TABLE_HANG_HOA (vì syncHangHoaData có thể không chạy nếu user upload qua xlsx)
+            const hangHoaTa = data['TABLE_HANG_HOA_TA'] && data['TABLE_HANG_HOA_TA'].length > 0
+                ? data['TABLE_HANG_HOA_TA'] 
+                : hangHoa;
+            
+            hangHoaTa.forEach((row, idx) => {
+                const sl  = parseFloat(row.NUM_SL  || 0);
+                const dg  = parseFloat(row.NUM_DON_GIA || 0);
+                const vat = parseFloat(row.NUM_VAT || 0);
+                const tt  = sl * dg * (1 + vat / 100);
+                row.NUM_THANH_TIEN = Math.round(tt).toLocaleString('vi-VN');
+                row.STT = String(idx + 1);
+            });
+
             const fmt = n => Math.round(n).toLocaleString('vi-VN');
             computed['TONG_CONG'] = fmt(tongCong);
 
@@ -5203,6 +5295,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
             if (typeof numberToVietnameseWords === 'function') {
                 computed['TIEN_BANG_CHU'] = numberToVietnameseWords(Math.round(tongTT));
+            }
+            if (typeof numberToEnglishWords === 'function') {
+                computed['TIEN_BANG_CHU_TA'] = numberToEnglishWords(Math.round(tongTT));
             }
 
             return computed;
@@ -5422,6 +5517,171 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             return tblXml;
         }
 
+        function buildHangHoaTableTaXml(hangHoaArr) {
+            const parseNum = s => parseFloat(String(s || '0').replace(/\./g, '').replace(',', '.')) || 0;
+            const fmtVND = n => Math.round(n).toLocaleString('vi-VN');
+
+            const borders = `<w:tcBorders>
+                <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+            </w:tcBorders>`;
+
+            const fontRpr = (bold = false, size = 20) => `<w:rPr>
+                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>
+                ${bold ? '<w:b/><w:bCs/>' : ''}
+                <w:sz w:val="${size}"/><w:szCs w:val="${size}"/>
+            </w:rPr>`;
+
+            const cell2Lines = (width, text1, text2, align = 'center', shade = '') =>
+                `<w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="${width}" w:type="dxa"/>
+                        ${borders}
+                        ${shade ? `<w:shd w:val="clear" w:color="auto" w:fill="${shade}"/>` : ''}
+                        <w:vAlign w:val="center"/>
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr><w:jc w:val="${align}"/><w:spacing w:before="60" w:after="0"/><w:rPr>${fontRpr(true)}</w:rPr></w:pPr>
+                        <w:r><w:rPr>${fontRpr(true)}</w:rPr><w:t xml:space="preserve">${text1}</w:t></w:r>
+                    </w:p>
+                    <w:p>
+                        <w:pPr><w:jc w:val="${align}"/><w:spacing w:before="0" w:after="60"/><w:rPr>${fontRpr(true).replace('</w:rPr>','<w:i/><w:iCs/></w:rPr>')}</w:rPr></w:pPr>
+                        <w:r><w:rPr>${fontRpr(true).replace('</w:rPr>','<w:i/><w:iCs/></w:rPr>')}</w:rPr><w:t xml:space="preserve">${text2}</w:t></w:r>
+                    </w:p>
+                </w:tc>`;
+
+            const cell = (width, text, align = 'left', bold = false, shade = '') =>
+                `<w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="${width}" w:type="dxa"/>
+                        ${borders}
+                        ${shade ? `<w:shd w:val="clear" w:color="auto" w:fill="${shade}"/>` : ''}
+                        <w:vAlign w:val="center"/>
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr>
+                            <w:jc w:val="${align}"/>
+                            <w:spacing w:before="60" w:after="60"/>
+                            <w:rPr>${fontRpr(bold)}</w:rPr>
+                        </w:pPr>
+                        <w:r>
+                            <w:rPr>${fontRpr(bold)}</w:rPr>
+                            <w:t xml:space="preserve">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</w:t>
+                        </w:r>
+                    </w:p>
+                </w:tc>`;
+
+            const headerRow = `<w:tr>
+                <w:trPr><w:trHeight w:val="800" w:hRule="atLeast"/><w:tblHeader/></w:trPr>
+                ${cell2Lines(600, 'STT', 'No.')}
+                ${cell2Lines(4084, 'Mô tả', 'Description')}
+                ${cell2Lines(900, 'SL', "Q'ty")}
+                ${cell2Lines(1500, 'Giá (VND)', 'Prices (VND)')}
+                ${cell2Lines(1600, 'Tổng Cộng (VND)', 'Total (VND)')}
+                ${cell2Lines(1500, 'VAT', 'VAT')}
+            </w:tr>`;
+
+            let tongTruocThue = 0;
+            let tongThue = 0;
+
+            const dataRows = hangHoaArr.map((row, idx) => {
+                const sl  = parseNum(row.NUM_SL);
+                const dg  = parseNum(row.NUM_DON_GIA);
+                const vat = parseFloat(row.NUM_VAT || 0);
+                const truocThue = sl * dg;
+                const tienThue  = truocThue * vat / 100;
+                
+                tongTruocThue  += truocThue;
+                tongThue       += tienThue;
+
+                const shade = ''; // no zebra striping in the user's image
+
+                return `<w:tr>
+                    <w:trPr><w:trHeight w:val="360" w:hRule="atLeast"/></w:trPr>
+                    ${cell(600,  String(idx + 1),          'center', false, shade)}
+                    ${cell(4084, String(row.TEN_HANG || ''),'left',   false, shade)}
+                    ${cell(900,  sl > 0 ? fmtVND(sl) : '', 'center',  false, shade)}
+                    ${cell(1500, dg > 0 ? fmtVND(dg) : '', 'right',  false, shade)}
+                    ${cell(1600, truocThue > 0 ? fmtVND(truocThue) : '', 'right',  false, shade)}
+                    ${cell(1500, tienThue > 0 ? fmtVND(tienThue) : '0', 'right',  false, shade)}
+                </w:tr>`;
+            });
+
+            const rowTruocThue = `<w:tr>
+                <w:trPr><w:trHeight w:val="420" w:hRule="atLeast"/></w:trPr>
+                <w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="7084" w:type="dxa"/>
+                        <w:gridSpan w:val="4"/>
+                        ${borders}
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr><w:jc w:val="center"/><w:spacing w:before="60" w:after="0"/><w:rPr>${fontRpr(true)}</w:rPr></w:pPr>
+                        <w:r><w:rPr>${fontRpr(true)}</w:rPr><w:t>Tổng giá trị chưa bao gồm VAT</w:t></w:r>
+                    </w:p>
+                    <w:p>
+                        <w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="60"/><w:rPr>${fontRpr(true).replace('</w:rPr>','<w:i/><w:iCs/></w:rPr>')}</w:rPr></w:pPr>
+                        <w:r><w:rPr>${fontRpr(true).replace('</w:rPr>','<w:i/><w:iCs/></w:rPr>')}</w:rPr><w:t>Total without VAT</w:t></w:r>
+                    </w:p>
+                </w:tc>
+                ${cell(1600, fmtVND(tongTruocThue), 'right', true)}
+                ${cell(1500, fmtVND(tongThue), 'right', true)}
+            </w:tr>`;
+
+            const rowSauThue = `<w:tr>
+                <w:trPr><w:trHeight w:val="420" w:hRule="atLeast"/></w:trPr>
+                <w:tc>
+                    <w:tcPr>
+                        <w:tcW w:w="8684" w:type="dxa"/>
+                        <w:gridSpan w:val="5"/>
+                        ${borders}
+                    </w:tcPr>
+                    <w:p>
+                        <w:pPr><w:jc w:val="center"/><w:spacing w:before="60" w:after="0"/><w:rPr>${fontRpr(true)}</w:rPr></w:pPr>
+                        <w:r><w:rPr>${fontRpr(true)}</w:rPr><w:t>Tổng giá trị đã bao gồm VAT</w:t></w:r>
+                    </w:p>
+                    <w:p>
+                        <w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="60"/><w:rPr>${fontRpr(true).replace('</w:rPr>','<w:i/><w:iCs/></w:rPr>')}</w:rPr></w:pPr>
+                        <w:r><w:rPr>${fontRpr(true).replace('</w:rPr>','<w:i/><w:iCs/></w:rPr>')}</w:rPr><w:t>Total with VAT</w:t></w:r>
+                    </w:p>
+                </w:tc>
+                ${cell(1500, fmtVND(tongTruocThue + tongThue), 'right', true)}
+            </w:tr>`;
+
+            const tblXml = `<w:tbl>
+                <w:tblPr>
+                    <w:tblStyle w:val="TableGrid"/>
+                    <w:tblW w:w="10184" w:type="dxa"/>
+                    <w:tblInd w:w="0" w:type="dxa"/>
+                    <w:tblBorders>
+                        <w:top    w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:left   w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:right  w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                        <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+                    </w:tblBorders>
+                    <w:tblLook w:val="04A0"/>
+                </w:tblPr>
+                <w:tblGrid>
+                    <w:gridCol w:w="600"/>
+                    <w:gridCol w:w="4084"/>
+                    <w:gridCol w:w="900"/>
+                    <w:gridCol w:w="1500"/>
+                    <w:gridCol w:w="1600"/>
+                    <w:gridCol w:w="1500"/>
+                </w:tblGrid>
+                ${headerRow}
+                ${dataRows.join('')}
+                ${rowTruocThue}
+                ${rowSauThue}
+            </w:tbl>`;
+
+            return tblXml;
+        }
+
         function buildGiaoHangTableXml(giaoHangArr) {
             const parseNum = s => parseFloat(String(s || '0').replace(/\./g, '').replace(',', '.')) || 0;
             const fmtVND = n => Math.round(n).toLocaleString('vi-VN');
@@ -5522,6 +5782,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     if (typeof numberToVietnameseWords === 'function') {
                         formData[`DOT_${i}_BANG_CHU`] = numberToVietnameseWords(Math.round(soTien));
                     }
+                    if (typeof numberToEnglishWords === 'function') {
+                        formData[`DOT_${i}_BANG_CHU_TA`] = numberToEnglishWords(Math.round(soTien));
+                    }
                     
                     // Update UI if present
                     const inputEl = document.getElementById(`dot_${i}_sotien`);
@@ -5536,7 +5799,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             const computed = computeFields(formData);
 
             // Cập nhật các input tổng tiền trên form
-            ['TONG_CONG','CHIET_KHAU_TIEN','VAT_TIEN','TONG_THANH_TOAN','TIEN_BANG_CHU'].forEach(f => {
+            ['TONG_CONG','CHIET_KHAU_TIEN','VAT_TIEN','TONG_THANH_TOAN','TIEN_BANG_CHU','TIEN_BANG_CHU_TA'].forEach(f => {
                 const el = document.querySelector(`[data-var="${f}"]`);
                 if (el) el.value = computed[f] || '';
                 formData[f] = computed[f] || '';
