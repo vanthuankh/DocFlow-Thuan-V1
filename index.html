@@ -283,26 +283,14 @@
                         </div>
                     </div>
 
-                    <div class="mt-auto flex flex-col gap-3 pt-4 border-t border-gray-100">
-                        <div class="flex gap-3">
-                            <button id="clear-session-btn" class="flex-1 bg-gray-100 text-gray-700 px-3 py-3 rounded-lg shadow-sm hover:bg-gray-200 transition font-medium flex justify-center items-center gap-2">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                Tạo mới
-                            </button>
-                        </div>
-                        <div class="flex gap-3">
-                            <button id="generate-docx-btn" class="flex-1 bg-blue-600 text-white px-3 py-3 rounded-lg shadow-sm hover:bg-blue-700 transition font-medium flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                Tải DOCX
-                            </button>
-                            <button id="generate-pdf-btn" class="flex-1 bg-red-600 text-white px-3 py-3 rounded-lg shadow-sm hover:bg-red-700 transition font-medium flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                                Tải PDF
-                            </button>
-                        </div>
-                        <button id="save-drive-btn" class="w-full bg-green-600 text-white px-3 py-3 rounded-lg shadow-sm hover:bg-green-700 transition font-medium flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <div class="mt-auto flex gap-3 pt-4 border-t border-gray-100">
+                        <button id="save-drive-btn" class="flex-[2] bg-blue-600 text-white px-3 py-3 rounded-xl shadow-sm hover:bg-blue-700 hover:shadow-blue-200 transition font-bold flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                            Lưu Drive
+                            Lưu tài liệu
+                        </button>
+                        <button id="clear-session-btn" class="flex-1 bg-gray-100 text-gray-700 px-3 py-3 rounded-xl shadow-sm hover:bg-gray-200 transition font-bold flex justify-center items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            Tạo mới
                         </button>
                     </div>
                 </div>
@@ -1721,8 +1709,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
         document.getElementById('template-upload').addEventListener('change', handleTemplateUpload);
         document.getElementById('data-upload').addEventListener('change', handleDataUpload);
-        document.getElementById('generate-docx-btn').addEventListener('click', () => generateDocument('docx'));
-        document.getElementById('generate-pdf-btn').addEventListener('click', () => generateDocument('pdf'));
         document.getElementById('clear-template-btn').addEventListener('click', clearSelectedTemplate);
         document.getElementById('clear-session-btn').addEventListener('click', () => {
             showConfirmModal('Tạo mới', 'Bạn có chắc chắn muốn xóa dữ liệu hiện tại để tạo mới?', () => {
@@ -2010,8 +1996,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             document.getElementById('selected-template-info').classList.remove('hidden');
             document.getElementById('selected-template-name').textContent = template.name;
             
-            document.getElementById('generate-docx-btn').disabled = false;
-            document.getElementById('generate-pdf-btn').disabled = false;
             document.getElementById('save-drive-btn').disabled = !currentTemplate;
             document.getElementById('customer-select-block').classList.remove('hidden');
 
@@ -2093,8 +2077,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             currentTemplate = null;
             renderTemplateList();
             document.getElementById('selected-template-info').classList.add('hidden');
-            document.getElementById('generate-docx-btn').disabled = true;
-            document.getElementById('generate-pdf-btn').disabled = true;
             document.getElementById('save-drive-btn').disabled = true;
             document.getElementById('customer-select-block').classList.add('hidden');
             
@@ -3379,41 +3361,24 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                             if (!Mammoth) throw new Error("Thư viện mammoth chưa được tải.");
                             const mammothResult = await Mammoth.convertToHtml({ arrayBuffer });
 
-                            const tempDiv = document.createElement('div');
-                            tempDiv.style.cssText = [
-                                'width:210mm',
-                                'padding:15mm 20mm',
-                                'font-family:Times New Roman,serif',
-                                'font-size:12pt',
-                                'line-height:1.6',
-                                'color:#000',
-                                'background:#fff',
-                                'box-sizing:border-box',
-                                'position:absolute',
-                                'top: 0',
-                                'left: 0',
-                                'z-index: -9999'
-                            ].join(';');
-                            tempDiv.innerHTML = mammothResult.value;
-                            document.body.appendChild(tempDiv);
-
-                            // Đợi render xong
-                            await new Promise(r => setTimeout(r, 200));
+                            const htmlContent = `
+                                <div style="width:210mm; padding:15mm 20mm; font-family:'Times New Roman',serif; font-size:12pt; line-height:1.6; color:#000; background:#fff; box-sizing:border-box;">
+                                    ${mammothResult.value}
+                                </div>
+                            `;
 
                             const opt = {
                                 margin:      [10, 15, 10, 15],
                                 image:       { type: 'jpeg', quality: 0.98 },
-                                html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
+                                html2canvas: { scale: 2, useCORS: true, logging: false },
                                 jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
                             };
 
-                            // Lấy blob thay vì save thẳng
+                            // Lấy blob
                             const pdfBlob = await html2pdf()
                                 .set(opt)
-                                .from(tempDiv)
+                                .from(htmlContent)
                                 .output('blob');
-
-                            document.body.removeChild(tempDiv);
 
                             if (pdfBlob && pdfBlob.size > 1000) {
                                 const pdfFileName = fileName.replace(/\.(docx|xlsx)$/, '.pdf');
@@ -4543,11 +4508,18 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                         </a>
                         <a href="${doc.webContentLink}" download
                            class="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
-                           title="Tải về">
+                           title="Tải gốc">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                             Tải
                         </a>
-                        <button onclick="deleteGeneratedDoc('${doc.id}', '${doc.name}')"
+                        ${ext === 'docx' ? `
+                        <button onclick="downloadListDocAsPDF('${doc.id}', '${doc.name.replace(/'/g, "\\'")}')"
+                           class="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded border border-red-200 hover:bg-red-50"
+                           title="Tải PDF">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                            PDF
+                        </button>` : ''}
+                        <button onclick="deleteGeneratedDoc('${doc.id}', '${doc.name.replace(/'/g, "\\'")}')"
                                 class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:bg-red-50"
                                 title="Xóa">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -4577,6 +4549,52 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     }
                 }
             );
+        };
+
+        window.downloadListDocAsPDF = async function(fileId, fileName) {
+            if (!fileName.toLowerCase().endsWith('.docx')) {
+                showToast('Tính năng chuyển đổi PDF hiện chỉ hỗ trợ biểu mẫu DOCX.', true);
+                return;
+            }
+            showToast('Đang xử lý tải xuống PDF...');
+            try {
+                // Fetch file bytes directly from Drive APIs
+                const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (!response.ok) throw new Error('Không thể tải file gốc từ Google Drive.');
+                
+                const arrayBuffer = await response.arrayBuffer();
+                const Mammoth = window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
+                if (!Mammoth) throw new Error("Thư viện mammoth chưa được tải.");
+                
+                const mammothResult = await Mammoth.convertToHtml({ arrayBuffer });
+                const htmlContent = `
+                    <div style="width:210mm; padding:15mm 20mm; font-family:'Times New Roman',serif; font-size:12pt; line-height:1.6; color:#000; background:#fff; box-sizing:border-box;">
+                        ${mammothResult.value}
+                    </div>
+                `;
+
+                const opt = {
+                    margin:      [10, 15, 10, 15],
+                    image:       { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                };
+
+                const pdfBlob = await html2pdf().set(opt).from(htmlContent).output('blob');
+
+                if (pdfBlob && pdfBlob.size > 1000) {
+                    const pdfFileName = fileName.replace(/\.docx$/, '.pdf');
+                    saveAs(pdfBlob, pdfFileName);
+                    showToast('Đã tải PDF thành công!');
+                } else {
+                    throw new Error("File PDF chuyển đổi bị trống hoặc lỗi cấu trúc.");
+                }
+            } catch (error) {
+                console.error("Lỗi xuất PDF từ list:", error);
+                showToast("Không thể tải PDF: " + (error.message || 'Lỗi không xác định.'), true);
+            }
         };
 
         document.getElementById('document-search').addEventListener('input', (e) => {
