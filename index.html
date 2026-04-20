@@ -281,6 +281,11 @@
                                 <p class="text-sm">Vui lòng chọn một biểu mẫu bên trái để bắt đầu.</p>
                             </div>
                         </div>
+
+                        <div id="document-note-container" class="mt-4 hidden xl:block">
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Ghi chú chung</label>
+                            <textarea id="document-note" rows="2" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Nhập ghi chú cho tài liệu này (nếu có)..."></textarea>
+                        </div>
                     </div>
 
                     <div class="mt-auto flex gap-3 pt-4 border-t border-gray-100">
@@ -419,6 +424,7 @@
                                     <th scope="col" class="px-6 py-3">Khách hàng</th>
                                     <th scope="col" class="px-6 py-3">Người tạo</th>
                                     <th scope="col" class="px-6 py-3">Ngày tạo</th>
+                                    <th scope="col" class="px-6 py-3">Ghi chú</th>
                                     <th scope="col" class="px-6 py-3 text-right">Thao tác</th>
                                 </tr>
                             </thead>
@@ -1995,6 +2001,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             
             document.getElementById('selected-template-info').classList.remove('hidden');
             document.getElementById('selected-template-name').textContent = template.name;
+            document.getElementById('document-note-container').classList.remove('hidden');
             
             document.getElementById('save-drive-btn').disabled = !currentTemplate;
             document.getElementById('customer-select-block').classList.remove('hidden');
@@ -2077,6 +2084,8 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             currentTemplate = null;
             renderTemplateList();
             document.getElementById('selected-template-info').classList.add('hidden');
+            document.getElementById('document-note-container').classList.add('hidden');
+            document.getElementById('document-note').value = '';
             document.getElementById('save-drive-btn').disabled = true;
             document.getElementById('customer-select-block').classList.add('hidden');
             
@@ -4489,8 +4498,18 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     <td class="px-4 py-3 text-sm text-gray-600 max-w-[160px] truncate">${templateName}</td>
                     <td class="px-4 py-3 text-sm text-gray-700 font-medium">${customerName}</td>
                     <td class="px-4 py-3">
+                        <div class="flex flex-col">
+                            ${doc.owners && doc.owners.length > 0 ? `
+                                <span class="text-sm text-gray-900">${doc.owners[0].displayName || 'Khách'}</span>
+                            ` : '<span class="text-gray-400 italic">Không rõ</span>'}
+                        </div>
+                    </td>
+                    <td class="px-4 py-3">
                         <div class="text-sm text-gray-800">${fmtDate}</div>
                         <div class="text-xs text-gray-400">${fmtTime}</div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-600 max-w-[200px] whitespace-normal line-clamp-2" title="${doc.appProperties?.note || ''}">
+                        ${doc.appProperties?.note || '<span class="text-gray-300 italic">Không có</span>'}
                     </td>
                     <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                         ${chainHtml}
@@ -5040,12 +5059,15 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     SO_BAO_GIA:  formData['SO_BAO_GIA']  || '',
                 }));
 
+                const docNote = document.getElementById('document-note')?.value?.trim();
+
                 const appProps = {
                     docflow:      'generated',
                     templateName: currentTemplate.name,
                     formDataKey:  _fdKey,
                     docNumber:    formData['MA_TAI_LIEU'] || '',
                     ...(selectedCustomer ? { customerName: selectedCustomer.ten_cong_ty } : {}),
+                    ...(docNote ? { note: docNote } : {})
                 };
                 
                 // Xác định folder đích theo thứ tự ưu tiên:
