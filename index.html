@@ -15,8 +15,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.11/docxtemplater.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     
     <style>
         body { font-family: 'Be Vietnam Pro', sans-serif; background-color: #f3f4f6; }
@@ -3206,8 +3204,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     if (type === 'docx') { // Download as xlsx
                         saveAs(blob, fileName.replace(/\.(docx|xlsx)$/, '.xlsx'));
                         showToast("Đã tải xuống file XLSX");
-                    } else if (type === 'pdf') {
-                        showToast("Chức năng xuất PDF từ Excel đang được phát triển", true);
                     }
                     
                     resultObj = { type: 'xlsx', blob: blob, extension: 'xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileName: fileName, docTypeCode: docTypeCode };
@@ -3363,49 +3359,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     if (type === 'docx') {
                         saveAs(out, fileName.replace(/\.(docx|xlsx)$/, '.docx'));
                         showToast("Đã tải xuống file DOCX");
-                    } else if (type === 'pdf') {
-                        try {
-                            const arrayBuffer = await out.arrayBuffer();
-                            const Mammoth = window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
-                            if (!Mammoth) throw new Error("Thư viện mammoth chưa được tải.");
-                            const mammothResult = await Mammoth.convertToHtml({ arrayBuffer });
-
-                            const htmlContent = `
-                                <div style="width:210mm; padding:15mm 20mm; font-family:'Times New Roman',serif; font-size:12pt; line-height:1.6; color:#000; background:#fff; box-sizing:border-box;">
-                                    ${mammothResult.value}
-                                </div>
-                            `;
-
-                            const opt = {
-                                margin:      [10, 15, 10, 15],
-                                image:       { type: 'jpeg', quality: 0.98 },
-                                html2canvas: { scale: 2, useCORS: true, logging: false },
-                                jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                            };
-
-                            // Lấy blob
-                            const pdfBlob = await html2pdf()
-                                .set(opt)
-                                .from(htmlContent)
-                                .output('blob');
-
-                            if (pdfBlob && pdfBlob.size > 1000) {
-                                const pdfFileName = fileName.replace(/\.(docx|xlsx)$/, '.pdf');
-                                saveAs(pdfBlob, pdfFileName);
-                                showToast('Đã tải xuống file PDF');
-                                // Gán resultObj cho save-to-Drive path
-                                resultObj = {
-                                    type: 'pdf', blob: pdfBlob, extension: 'pdf',
-                                    mimeType: 'application/pdf',
-                                    fileName: pdfFileName, docTypeCode: docTypeCode
-                                };
-                            } else {
-                                throw new Error("File PDF trống.");
-                            }
-                        } catch (pdfError) {
-                            console.error("Lỗi tạo PDF:", pdfError);
-                            throw new Error("PDF_CONVERSION_ERROR");
-                        }
                     }
                     
                     resultObj = { type: 'docx', blob: out, extension: 'docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileName: fileName, docTypeCode: docTypeCode };
@@ -3423,7 +3376,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
 
                     const docInfo = {
                         id: 'local_' + Date.now(),
-                        name: fileName.replace(/\.(docx|xlsx)$/, type === 'pdf' ? '.pdf' : '.' + resultObj.extension),
+                        name: fileName.replace(/\.(docx|xlsx)$/, '.' + resultObj.extension),
                         createdTime: new Date().toISOString(),
                         appProperties: {
                             templateName: currentTemplate.name,
@@ -3456,9 +3409,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     isKnownError = true;
                 } else if (error.message === "Multi error" || (error.properties && error.properties.errors)) {
                     msg = getDocxtemplaterErrorMessage(error);
-                    isKnownError = true;
-                } else if (error.message === "PDF_CONVERSION_ERROR") {
-                    msg = "Trình chuyển đổi HTML sang PDF gặp sự cố (có thể do lỗi font hoặc CSS phức tạp). Vui lòng thử tải DOCX thay thế.";
                     isKnownError = true;
                 } else {
                     msg = error.message || msg;
@@ -4531,13 +4481,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                             Tải
                         </a>
-                        ${ext === 'docx' ? `
-                        <button onclick="downloadListDocAsPDF('${doc.id}', '${doc.name.replace(/'/g, "\\'")}')"
-                           class="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded border border-red-200 hover:bg-red-50"
-                           title="Tải PDF">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                            PDF
-                        </button>` : ''}
                         <button onclick="deleteGeneratedDoc('${doc.id}', '${doc.name.replace(/'/g, "\\'")}')"
                                 class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:bg-red-50"
                                 title="Xóa">
@@ -4568,81 +4511,6 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                     }
                 }
             );
-        };
-
-        window.downloadListDocAsPDF = async function(fileId, fileName) {
-            if (!fileName.toLowerCase().endsWith('.docx')) {
-                showToast('Tính năng chuyển đổi PDF hiện chỉ hỗ trợ biểu mẫu DOCX.', true);
-                return;
-            }
-            showToast('Đang xử lý tải xuống PDF...');
-            try {
-                // Fetch file bytes directly from Drive APIs
-                const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
-                if (!response.ok) throw new Error('Không thể tải file gốc từ Google Drive.');
-                
-                const arrayBuffer = await response.arrayBuffer();
-                const Mammoth = window.mammoth || (typeof mammoth !== 'undefined' ? mammoth : null);
-                if (!Mammoth) throw new Error("Thư viện mammoth chưa được tải.");
-                
-                const mammothResult = await Mammoth.convertToHtml({ arrayBuffer });
-                
-                // Tránh lỗi html2pdf inject div vào thẻ body đang là flex-row (làm bóp méo khung)
-                const tempDiv = document.createElement('div');
-                tempDiv.style.position = 'absolute';
-                tempDiv.style.left = '0';
-                tempDiv.style.top = '0';
-                tempDiv.style.width = '210mm';
-                tempDiv.style.backgroundColor = '#fff';
-                tempDiv.style.color = '#000';
-                tempDiv.style.zIndex = '-9999';
-                tempDiv.style.padding = '15mm 20mm';
-                tempDiv.style.boxSizing = 'border-box';
-                tempDiv.style.fontFamily = '"Times New Roman", Times, serif';
-                tempDiv.style.fontSize = '12pt';
-                tempDiv.style.lineHeight = '1.6';
-
-                // Bổ sung style cơ bản cho bảng khi Mammoth xuất ra HTML không có style
-                tempDiv.innerHTML = `
-                    <style>
-                        .pdf-render-content table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-                        .pdf-render-content td, .pdf-render-content th { border: 1px solid #000; padding: 6px; vertical-align: top; }
-                        .pdf-render-content p { margin: 0 0 8px 0; text-align: justify; }
-                        .pdf-render-content img { max-width: 100%; height: auto; }
-                    </style>
-                    <div class="pdf-render-content">
-                        ${mammothResult.value}
-                    </div>
-                `;
-
-                document.body.appendChild(tempDiv);
-                
-                // Chờ DOM cập nhật layout
-                await new Promise(r => setTimeout(r, 200));
-
-                const opt = {
-                    margin:      [10, 15, 10, 15],
-                    image:       { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, windowWidth: tempDiv.scrollWidth, scrollY: 0, scrollX: 0 },
-                    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                };
-
-                const pdfBlob = await html2pdf().set(opt).from(tempDiv).output('blob');
-                document.body.removeChild(tempDiv);
-
-                if (pdfBlob && pdfBlob.size > 1000) {
-                    const pdfFileName = fileName.replace(/\.docx$/, '.pdf');
-                    saveAs(pdfBlob, pdfFileName);
-                    showToast('Đã tải PDF thành công!');
-                } else {
-                    throw new Error("File PDF chuyển đổi bị trống hoặc lỗi cấu trúc.");
-                }
-            } catch (error) {
-                console.error("Lỗi xuất PDF từ list:", error);
-                showToast("Không thể tải PDF: " + (error.message || 'Lỗi không xác định.'), true);
-            }
         };
 
         document.getElementById('document-search').addEventListener('input', (e) => {
@@ -5106,9 +4974,41 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const _resultType = result.docTypeCode && result.docTypeCode !== 'TL'
                     ? result.docTypeCode
                     : detectDocTypeFromFormData(formData, currentTemplate?.name || '');
-                const folderId = (driveDocFolderIds && driveDocFolderIds[_resultType])
+                let folderId = (driveDocFolderIds && driveDocFolderIds[_resultType])
                     || driveRootFolderId
                     || null;
+
+                // Create subfolder by customer info if exists
+                if (selectedCustomer && selectedCustomer.ten_viet_tat && folderId) {
+                    let customerAbbr = selectedCustomer.ten_viet_tat.trim();
+
+                    if (customerAbbr) {
+                        try {
+                            const query = `name = '${customerAbbr.replace(/'/g, "\\'")}' and '${folderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+                            const resp = await gapi.client.drive.files.list({
+                                q: query,
+                                fields: 'files(id, name)',
+                                spaces: 'drive'
+                            });
+                            
+                            if (resp.result.files && resp.result.files.length > 0) {
+                                folderId = resp.result.files[0].id;
+                            } else {
+                                const createResp = await gapi.client.drive.files.create({
+                                    resource: {
+                                        name: customerAbbr,
+                                        mimeType: 'application/vnd.google-apps.folder',
+                                        parents: [folderId]
+                                    },
+                                    fields: 'id'
+                                });
+                                folderId = createResp.result.id;
+                            }
+                        } catch (err) {
+                            console.error("Lỗi khi tạo thư mục khách hàng:", err);
+                        }
+                    }
+                }
 
                 console.log('Saving to folder type:', _resultType, '| folderId:', folderId);
 
