@@ -4588,20 +4588,49 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 if (!Mammoth) throw new Error("Thư viện mammoth chưa được tải.");
                 
                 const mammothResult = await Mammoth.convertToHtml({ arrayBuffer });
-                const htmlContent = `
-                    <div style="width:210mm; padding:15mm 20mm; font-family:'Times New Roman',serif; font-size:12pt; line-height:1.6; color:#000; background:#fff; box-sizing:border-box;">
+                
+                // Tránh lỗi html2pdf inject div vào thẻ body đang là flex-row (làm bóp méo khung)
+                const tempDiv = document.createElement('div');
+                tempDiv.style.position = 'absolute';
+                tempDiv.style.left = '0';
+                tempDiv.style.top = '0';
+                tempDiv.style.width = '210mm';
+                tempDiv.style.backgroundColor = '#fff';
+                tempDiv.style.color = '#000';
+                tempDiv.style.zIndex = '-9999';
+                tempDiv.style.padding = '15mm 20mm';
+                tempDiv.style.boxSizing = 'border-box';
+                tempDiv.style.fontFamily = '"Times New Roman", Times, serif';
+                tempDiv.style.fontSize = '12pt';
+                tempDiv.style.lineHeight = '1.6';
+
+                // Bổ sung style cơ bản cho bảng khi Mammoth xuất ra HTML không có style
+                tempDiv.innerHTML = `
+                    <style>
+                        .pdf-render-content table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+                        .pdf-render-content td, .pdf-render-content th { border: 1px solid #000; padding: 6px; vertical-align: top; }
+                        .pdf-render-content p { margin: 0 0 8px 0; text-align: justify; }
+                        .pdf-render-content img { max-width: 100%; height: auto; }
+                    </style>
+                    <div class="pdf-render-content">
                         ${mammothResult.value}
                     </div>
                 `;
 
+                document.body.appendChild(tempDiv);
+                
+                // Chờ DOM cập nhật layout
+                await new Promise(r => setTimeout(r, 200));
+
                 const opt = {
                     margin:      [10, 15, 10, 15],
                     image:       { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    html2canvas: { scale: 2, useCORS: true, windowWidth: tempDiv.scrollWidth, scrollY: 0, scrollX: 0 },
                     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 };
 
-                const pdfBlob = await html2pdf().set(opt).from(htmlContent).output('blob');
+                const pdfBlob = await html2pdf().set(opt).from(tempDiv).output('blob');
+                document.body.removeChild(tempDiv);
 
                 if (pdfBlob && pdfBlob.size > 1000) {
                     const pdfFileName = fileName.replace(/\.docx$/, '.pdf');
