@@ -4599,7 +4599,7 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             let hasHangHoa = false;
             if (formDataKey) {
                 try {
-                    const savedDataStr = localStorage.getItem('docflow_form_data_' + formDataKey);
+                    const savedDataStr = localStorage.getItem('docflow_formdata_' + formDataKey);
                     if (savedDataStr) {
                         const parsedData = JSON.parse(savedDataStr);
                         // Hỗ trợ cả bảng hàng hoá (TABLE_HANG_HOA) và biên bản giao hàng (TABLE_GIAO_HANG)
