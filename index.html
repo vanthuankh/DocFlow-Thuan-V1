@@ -2579,25 +2579,24 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                             + Thêm dòng
                         </button>
                     </div>
-                    <div class="border border-gray-200 border-t-0 rounded-b-xl overflow-hidden">
+                    <div class="border border-black overflow-hidden bg-white mt-2">
                         <div class="overflow-x-auto w-full">
-                            <table class="w-full text-sm min-w-[800px] table-fixed" id="table-hang-hoa">
+                            <table class="w-full text-sm min-w-[800px] table-fixed border-collapse" id="table-hang-hoa">
                                 <thead>
-                                    <tr class="bg-gray-700 text-white">
-                                        <th class="px-3 py-2.5 text-center font-semibold border-r border-gray-600">Tên sản phẩm</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 80px;">Đơn vị tính</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 80px;">Số lượng</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 140px;">Đơn giá</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold border-r border-gray-600" style="width: 90px;">Thuế</th>
-                                        <th class="px-2 py-2.5 text-center font-semibold bg-blue-800" style="width: 160px;">Thành tiền</th>
-                                        <th style="width: 40px;"></th>
+                                    <tr class="text-gray-900 border-b border-black font-bold" style="background-color: #d2e3fc;">
+                                        <th class="px-2 py-2.5 text-center border-r border-black" style="width: 50px;">STT</th>
+                                        <th class="px-3 py-2.5 text-center border-r border-black">Tên hàng hóa / Dịch vụ</th>
+                                        <th class="px-2 py-2.5 text-center border-r border-black" style="width: 70px;">ĐVT</th>
+                                        <th class="px-2 py-2.5 text-center border-r border-black" style="width: 70px;">Số<br>lượng</th>
+                                        <th class="px-2 py-2.5 text-center border-r border-black" style="width: 130px;">Đơn giá<br>(VNĐ)</th>
+                                        <th class="px-2 py-2.5 text-center border-r border-black" style="width: 80px;">Thuế<br>GTGT</th>
+                                        <th class="px-2 py-2.5 text-center border-r border-black" style="width: 150px;">Thành tiền (VNĐ)</th>
+                                        <th style="width: 50px;" class="border-l border-black"></th>
                                     </tr>
                                 </thead>
-                                <tbody id="tbody-hang-hoa" class="divide-y divide-gray-100 bg-white"></tbody>
+                                <tbody id="tbody-hang-hoa" class="bg-white"></tbody>
+                                <tfoot id="totals-hang-hoa" class="bg-white text-gray-900 text-sm font-medium"></tfoot>
                             </table>
-                        </div>
-                        <div id="totals-hang-hoa"
-                             class="border-t border-gray-200 bg-gray-50 px-5 py-3 text-right space-y-1">
                         </div>
                     </div>
                 `;
@@ -2620,17 +2619,28 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             for (const [tableName, cols] of Object.entries(templateTables)) {
                 if (tableName === 'TABLE_HANG_HOA' || tableName === 'HANG_HOA' || tableName === 'TABLE_HANG_HOA_TA' || tableName === 'HANG_HOA_TA') continue; // Đã xử lý ở trên
                 const tableDiv = document.createElement('div');
-                tableDiv.className = 'col-span-full mt-4 border border-gray-200 rounded-lg overflow-hidden bg-white min-w-0 w-full';
-                let ths = cols.map(c => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">${c}</th>`).join('');
+                tableDiv.className = 'col-span-full mt-4 border border-black rounded-lg overflow-hidden bg-white min-w-0 w-full';
+                const COL_LABELS = {
+                    STT:'STT', TEN_HANG:'Tên hàng hóa / Dịch vụ',
+                    DVT:'ĐVT', NUM_SL:'Số lượng',
+                    NUM_DON_GIA:'Đơn giá (VNĐ)', NUM_THANH_TIEN:'Thành tiền (VNĐ)',
+                    GHI_CHU:'Ghi chú'
+                };
+                let ths = cols.map((c, i) => {
+                    const width = c === 'STT' ? '50px' : (c === 'DVT' || c === 'NUM_SL' ? '70px' : 'auto');
+                    return `<th class="px-2 py-2.5 text-center font-bold border-r border-black" style="width: ${width};">${COL_LABELS[c] || c}</th>`;
+                }).join('');
                 tableDiv.innerHTML = `
-                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-black flex justify-between items-center">
                         <h3 class="text-sm font-semibold text-gray-700">${tableName}</h3>
-                        <button type="button" class="add-row-btn text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200" data-table="${tableName}">+ Thêm dòng</button>
+                        <button type="button" class="add-row-btn text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded border border-blue-200 hover:bg-blue-200" data-table="${tableName}">+ Thêm dòng</button>
                     </div>
-                    <div class="overflow-x-auto w-full">
-                        <table class="min-w-[800px] w-full divide-y divide-gray-200" id="table-${tableName}">
-                            <thead class="bg-gray-50"><tr>${ths}<th class="px-4 py-2 w-10"></th></tr></thead>
-                            <tbody class="bg-white divide-y divide-gray-200" id="tbody-${tableName}"></tbody>
+                    <div class="overflow-x-auto w-full p-2">
+                        <table class="min-w-[800px] w-full border-collapse border border-black" id="table-${tableName}">
+                            <thead class="text-gray-900 border-b border-black font-bold" style="background-color: #d2e3fc;">
+                                <tr>${ths}<th class="px-4 py-2 text-center" style="width: 50px;"></th></tr>
+                            </thead>
+                            <tbody class="bg-white" id="tbody-${tableName}"></tbody>
                         </table>
                     </div>`;
                 formContainer.appendChild(tableDiv);
@@ -2681,29 +2691,26 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             let tds = cols.map(c => {
                 const val = rowData[c] !== undefined ? rowData[c] : '';
                 if (c === 'STT') {
-                    return `<td class="px-3 py-2 text-center text-sm text-gray-500 w-10" data-stt="${rowIndex}">${rowIndex}</td>`;
+                    return `<td class="text-center font-medium border border-black align-middle text-gray-700" data-stt="${rowIndex}">${rowIndex}</td>`;
                 }
                 if (c === 'NUM_THANH_TIEN') {
-                    return `<td class="px-2 py-2"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" readonly class="w-full text-sm border-gray-200 bg-blue-50 rounded p-1 text-right font-semibold text-blue-700 cursor-default" placeholder="Tự tính"></td>`;
+                    return `<td class="border border-black align-middle"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" readonly class="w-full text-sm bg-transparent px-2 py-1.5 outline-none text-right font-medium text-gray-900 cursor-default block" placeholder="Tự tính"></td>`;
                 }
                 if (c.startsWith('NUM_')) {
-                    return `<td class="px-2 py-2"><input type="number" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm border-gray-300 rounded p-1 text-right focus:ring-1 focus:ring-blue-400 border" placeholder="0" min="0"></td>`;
+                    return `<td class="border border-black align-middle"><input type="number" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm bg-transparent px-2 py-1.5 focus:ring-1 focus:ring-blue-400 outline-none text-right calc-trigger hide-spin-button block" placeholder="0" min="0"></td>`;
                 }
                 
-                // Cần lấy COL_LABELS từ scope bên ngoài hoặc định nghĩa lại nếu cần
-                const COL_LABELS = {
-                    STT:'STT', TEN_HANG:'Tên hàng hóa / Dịch vụ',
-                    DVT:'ĐVT', NUM_SL:'Số lượng',
-                    NUM_DON_GIA:'Đơn giá (VNĐ)', NUM_THANH_TIEN:'Thành tiền (VNĐ)',
-                    GHI_CHU:'Ghi chú'
-                };
-                return `<td class="px-2 py-2"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm border-gray-300 rounded p-1 focus:ring-1 focus:ring-blue-400 border" placeholder="${COL_LABELS[c] || c}"></td>`;
+                return `<td class="border border-black align-middle"><input type="text" data-table="${tableName}" data-col="${c}" value="${val}" class="w-full text-sm bg-transparent px-2 py-1.5 focus:ring-1 focus:ring-blue-400 outline-none block" placeholder="Nhập..."></td>`;
             }).join('');
             
             tr.innerHTML = `
                 ${tds}
-                <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
-                    <button type="button" class="text-red-600 hover:text-red-900 remove-row-btn">Xóa</button>
+                <td class="text-center w-10 align-middle border-r border-b border-black">
+                    <button type="button" class="text-gray-400 hover:text-red-600 remove-row-btn transition-colors mx-auto block" title="Xóa dòng">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
                 </td>
             `;
             
@@ -2784,44 +2791,39 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             ).join('');
 
             tr.innerHTML = `
-                <td class="px-2 py-1.5 w-full border-r border-gray-100 align-top">
+                <td class="text-center font-medium border border-black align-middle text-gray-700" data-stt="${idx}">${idx}</td>
+                <td class="w-full border border-black align-top">
                     <textarea data-col="TEN_HANG" rows="3" placeholder="Tên sản phẩm..."
-                           class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none resize-none overflow-y-auto">${ten}</textarea>
+                           class="w-full text-sm bg-transparent px-2 py-1.5 focus:ring-1 focus:ring-blue-400 outline-none resize-none overflow-y-auto block">${ten}</textarea>
                 </td>
-                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 80px; min-width: 80px;">
+                <td class="border border-black align-top" style="width: 70px;">
                     <input type="text" data-col="DVT" value="${dvt}"
                            placeholder="cái"
-                           class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-center">
+                           class="w-full text-sm bg-transparent px-1 py-1.5 focus:ring-1 focus:ring-blue-400 outline-none text-center">
                 </td>
-                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 80px; min-width: 80px;">
+                <td class="border border-black align-top" style="width: 70px;">
                     <input type="number" data-col="NUM_SL" value="${sl}"
                            placeholder="0" min="0" step="any"
-                           class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger hide-spin-button">
+                           class="w-full text-sm bg-transparent px-1 py-1.5 focus:ring-1 focus:ring-blue-400 outline-none text-center calc-trigger hide-spin-button">
                 </td>
-                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 140px; min-width: 140px;">
+                <td class="border border-black align-top" style="width: 130px;">
                     <input type="number" data-col="NUM_DON_GIA" value="${dg}"
                            placeholder="0" min="0" step="any"
-                           class="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5
-                                  focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-right calc-trigger hide-spin-button">
+                           class="w-full text-sm bg-transparent px-2 py-1.5 focus:ring-1 focus:ring-blue-400 outline-none text-right calc-trigger hide-spin-button">
                 </td>
-                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 70px; min-width: 70px;">
+                <td class="border border-black align-top" style="width: 80px;">
                     <select data-col="NUM_VAT"
-                            class="w-full text-sm border border-gray-300 rounded-md px-1 py-1.5
-                                   focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none bg-white text-center calc-trigger">
+                            class="w-full text-sm px-1 py-1.5 bg-transparent focus:ring-1 focus:ring-blue-400 outline-none text-center calc-trigger appearance-none">
                         ${vatOpts}
                     </select>
                 </td>
-                <td class="px-1.5 py-1.5 border-r border-gray-100 align-top" style="width: 160px; min-width: 160px;">
+                <td class="border border-black align-middle" style="width: 150px;">
                     <input type="text" data-col="NUM_THANH_TIEN" value="${tt}"
                            readonly placeholder="Tự tính"
-                           class="w-full text-sm border border-gray-200 bg-blue-50 rounded-md px-2 py-1.5
-                                  outline-none text-right font-semibold text-blue-700 cursor-default">
+                           class="w-full text-sm bg-transparent px-2 py-1.5 outline-none text-right font-medium text-gray-900 cursor-default block">
                 </td>
-                <td class="px-2 py-1.5 text-center w-8 align-top">
-                    <button type="button" class="remove-hh-btn text-gray-300 hover:text-red-500 transition-colors mt-1"
+                <td class="text-center w-10 align-middle border-r border-b border-black">
+                    <button type="button" class="remove-hh-btn text-gray-400 hover:text-red-600 transition-colors mx-auto block"
                             title="Xóa dòng">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -2884,11 +2886,16 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             syncHangHoaData();
             const rows = formData['TABLE_HANG_HOA'] || [];
 
-            // Tổng thành tiền (đã gồm VAT từng dòng)
+            // Tổng thành tiền và tổng hàng (trước thuế)
             let tongCong = 0;
+            let tongHang = 0;
             rows.forEach(r => {
                 const tt = parseFloat(String(r.NUM_THANH_TIEN || '0').replace(/\./g, '').replace(',', '.')) || 0;
                 tongCong += tt;
+                
+                const dg = parseFloat(String(r.NUM_DON_GIA || '0').replace(/\./g, '').replace(',', '.')) || 0;
+                const sl = parseFloat(String(r.NUM_SL || '0').replace(/\./g, '').replace(',', '.')) || 0;
+                tongHang += (dg * sl);
             });
 
             // Chiết khấu tổng (từ SELECT_CHIET_KHAU trên form)
@@ -2901,20 +2908,31 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
             // Hiển thị tổng dưới bảng
             const totalsDiv = document.getElementById('totals-hang-hoa');
             if (totalsDiv) {
+                // Calculate total tax
+                let tongThue = tongCong - tongHang;
+                
                 totalsDiv.innerHTML = `
-                    <div class="flex justify-end gap-8 text-sm py-0.5">
-                        <span class="text-gray-500">Tổng cộng (đã gồm VAT từng dòng):</span>
-                        <span class="font-semibold text-gray-800 w-40 text-right">${fmt(tongCong)} VNĐ</span>
-                    </div>
+                    <tr class="border-b border-black">
+                        <td colspan="6" class="text-right py-2 px-3 border-r border-black">Cộng tiền hàng (chưa thuế):</td>
+                        <td class="text-right py-2 px-3 font-semibold border-r border-black">${fmt(tongHang)}</td>
+                        <td class="border-black"></td>
+                    </tr>
                     ${ckPct > 0 ? `
-                    <div class="flex justify-end gap-8 text-sm py-0.5">
-                        <span class="text-gray-500">Chiết khấu (${ckPct}%):</span>
-                        <span class="font-semibold text-red-600 w-40 text-right">− ${fmt(ckTien)} VNĐ</span>
-                    </div>` : ''}
-                    <div class="flex justify-end gap-8 text-sm font-bold pt-1.5 border-t border-gray-300 mt-1">
-                        <span class="text-gray-800">TỔNG THANH TOÁN:</span>
-                        <span class="text-blue-700 text-base w-40 text-right">${fmt(tongTT)} VNĐ</span>
-                    </div>
+                    <tr class="border-b border-black">
+                        <td colspan="6" class="text-right py-2 px-3 border-r border-black">Chiết khấu (${ckPct}%):</td>
+                        <td class="text-right py-2 px-3 font-semibold text-red-600 border-r border-black">− ${fmt(ckTien)}</td>
+                        <td class="border-black"></td>
+                    </tr>` : ''}
+                    <tr class="border-b border-black">
+                        <td colspan="6" class="text-right py-2 px-3 border-r border-black">Tổng thuế GTGT:</td>
+                        <td class="text-right py-2 px-3 font-semibold border-r border-black">${fmt(tongThue)}</td>
+                        <td class="border-black"></td>
+                    </tr>
+                    <tr class="border-b border-black font-bold" style="background-color: #d2e3fc;">
+                        <td colspan="6" class="text-right py-2.5 px-3 border-r border-black uppercase">TỔNG CỘNG (đã bao gồm thuế):</td>
+                        <td class="text-right py-2.5 px-3 border-r border-black">${fmt(tongTT)}</td>
+                        <td class="border-black"></td>
+                    </tr>
                 `;
             }
 
@@ -4915,7 +4933,14 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 const tbody = tableContainer.querySelector('tbody');
                 if (!tbody) continue;
                 tbody.innerHTML = '';
-                const cols = Object.keys(value[0] || {}).filter(k => k !== 'STT');
+                
+                // Fetch cols from the original template to ensure headers align correctly
+                // Fallback to object keys if not found, but keep STT out of guessing if not matching template
+                let cols = templateTables[key] || templateTables['TABLE_' + tableName] || templateTables[tableName];
+                if (!cols) {
+                    cols = Object.keys(value[0] || {}).filter(k => k !== 'STT');
+                }
+                
                 const tName = (tableContainer.id && tableContainer.id.replace('table-', '')) || tableContainer.dataset.tableName || key;
                 value.forEach(rowData => {
                     // Cần truyền đúng tên biến đang dùng (key) thay vì tableName
