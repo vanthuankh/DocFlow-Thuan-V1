@@ -385,10 +385,6 @@
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-lg font-semibold text-gray-800">Tài liệu đã tạo</h2>
                         <div class="flex gap-2">
-                            <button onclick="exportDocumentsToExcel()" class="flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                Xuất Excel
-                            </button>
                             <div class="relative">
                                 <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                                     <svg class="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/></svg>
@@ -4567,8 +4563,14 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                            class="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
                            title="Tải gốc">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            Tải
+                            Tải DOCX
                         </a>
+                        <button onclick="exportSingleDocToExcel('${doc.id}')"
+                                class="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded border border-green-200 hover:bg-green-50"
+                                title="Tải Excel">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Tải Excel
+                        </button>
                         <button onclick="deleteGeneratedDoc('${doc.id}', '${doc.name.replace(/'/g, "\\'")}')"
                                 class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:bg-red-50"
                                 title="Xóa">
@@ -4580,6 +4582,74 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
                 tbody.appendChild(tr);
             });
         }
+
+        window.exportSingleDocToExcel = function(docId) {
+            const doc = generatedDocuments.find(d => d.id === docId);
+            if (!doc) {
+                showToast("Không tìm thấy tài liệu.", true);
+                return;
+            }
+
+            const excelData = [];
+            const customerName = doc.appProperties?.customerName || 'N/A';
+            const dateObj = new Date(doc.createdTime);
+            const dateStr = `${dateObj.getDate().toString().padStart(2,'0')}/${(dateObj.getMonth()+1).toString().padStart(2,'0')}/${dateObj.getFullYear()}`;
+            const formDataKey = doc.appProperties?.formDataKey;
+            
+            let hasHangHoa = false;
+            if (formDataKey) {
+                try {
+                    const savedDataStr = localStorage.getItem('docflow_form_data_' + formDataKey);
+                    if (savedDataStr) {
+                        const parsedData = JSON.parse(savedDataStr);
+                        // Hỗ trợ cả bảng hàng hoá (TABLE_HANG_HOA) và biên bản giao hàng (TABLE_GIAO_HANG)
+                        const hangHoaList = parsedData['TABLE_HANG_HOA'] || parsedData['TABLE_GIAO_HANG'] || [];
+                        
+                        if (Array.isArray(hangHoaList) && hangHoaList.length > 0) {
+                            hasHangHoa = true;
+                            hangHoaList.forEach(item => {
+                                excelData.push({
+                                    'Tên khách hàng': customerName,
+                                    'Ngày tạo': dateStr,
+                                    'Tên hàng hóa': item.TEN_HANG || '',
+                                    'ĐVT': item.DVT || '',
+                                    'Số lượng': item.NUM_SL || 0,
+                                    'Đơn giá': item.NUM_DON_GIA || 0,
+                                    'Thuế GTGT (%)': item.NUM_VAT || 0,
+                                    'Thành tiền': item.NUM_THANH_TIEN || 0
+                                });
+                            });
+                        }
+                    }
+                } catch (e) {
+                     console.error("Lỗi parse form data cho excel:", e);
+                }
+            }
+            
+            if (!hasHangHoa) {
+                excelData.push({
+                    'Tên khách hàng': customerName,
+                    'Ngày tạo': dateStr,
+                    'Tên hàng hóa': '',
+                    'ĐVT': '',
+                    'Số lượng': '',
+                    'Đơn giá': '',
+                    'Thuế GTGT (%)': '',
+                    'Thành tiền': ''
+                });
+            }
+
+            try {
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Chi_Tiet_Tai_Lieu");
+                XLSX.writeFile(wb, (doc.name.replace(/\.(docx|pdf)$/, '') + "_HangHoa.xlsx"));
+                showToast("Đã xuất file Excel thành công!");
+            } catch (err) {
+                console.error(err);
+                showToast("Lỗi khi xuất file Excel.", true);
+            }
+        };
 
         window.deleteGeneratedDoc = function(fileId, fileName) {
             showConfirmModal(
