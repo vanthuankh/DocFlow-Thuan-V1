@@ -4875,6 +4875,9 @@ const GOOGLE_API_KEY   = 'YOUR_API_KEY_HERE';</pre>
         };
 
         function fillFormWithData(data) {
+            // Đảm bảo các thuộc tính ẩn (như PHIEN_BAN) cũng được cập nhật vào formData hiện tại
+            formData = { ...formData, ...data };
+            
             const inputs = document.querySelectorAll(
                 '#dynamic-form input[data-var], #dynamic-form textarea[data-var], #dynamic-form select[data-var]'
             );
